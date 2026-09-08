@@ -1,0 +1,464 @@
+TEST_setupAndPreview()
+7:15:09 PM	Notice	Execution started
+7:18:05 PM	Info	Logging output too large. Truncating output. {
+  "ok": true,
+  "totalPlayerRows": 88,
+  "clusters": [
+    {
+      "clusterKey": "dd5339aa44de59234c869d5af2e6",
+      "memberRows": [
+        3
+      ],
+      "registrationIds": [
+        "reg_a9f6a183-35d4-48bc-8d52-bf0223ed5c68"
+      ],
+      "childNames": [
+        "Alex Robinson",
+        "Anna Robinson"
+      ],
+      "childKeys": [
+        "name:alexrobinson",
+        "name:annarobinson"
+      ],
+      "recipientEmails": [
+        "krissiegolden@gmail.com"
+      ],
+      "recommendedCanonicalRegistrationId": "reg_a9f6a183-35d4-48bc-8d52-bf0223ed5c68",
+      "manualReviewReasons": []
+    },
+    {
+      "clusterKey": "58cb7e794a032d0d58efe74373f1",
+      "memberRows": [
+        12,
+        51
+      ],
+      "registrationIds": [
+        "reg_88496bc4-9731-4cde-b9d1-e429ac6225c6",
+        "reg_b184c92f-0025-4308-99e1-97710e1e2ff3"
+      ],
+      "childNames": [
+        "Arsenio Wickes"
+      ],
+      "childKeys": [
+        "name:arseniowickes"
+      ],
+      "recipientEmails": [
+        "azajerronw@gmail.com",
+        "azas1993@icloud.com"
+      ],
+      "recommendedCanonicalRegistrationId": "reg_b184c92f-0025-4308-99e1-97710e1e2ff3",
+      "manualReviewReasons": []
+    },
+    {
+      "clusterKey": "6d73066d54f47038e6b71f389040",
+      "memberRows": [
+        14,
+        79,
+        80
+      ],
+      "registrationIds": [
+        "reg_28cfa9cb-72c9-41ba-a0e1-91c6bf9e61d1",
+        "reg_481d91a9-fb41-4e98-aaf0-6b5ccc96beec",
+        "reg_afc5c0f7-7ce8-4dfd-906b-9c4a44c4c191"
+      ],
+      "childNames": [
+        "Amaree Winkler-Matchem"
+      ],
+      "childKeys": [
+        "name:amareewinklermatchem"
+      ],
+      "recipientEmails": [
+        "winkleralexis93@gmail.com"
+      ],
+      "recommendedCanonicalRegistrationId": "reg_28cfa9cb-72c9-41ba-a0e1-91c6bf9e61d1",
+      "manualReviewReasons": []
+    },
+    {
+      "clusterKey": "70dbe640cc90eb87d87f04354b8c",
+      "memberRows": [
+        19
+      ],
+      "registrationIds": [
+        "reg_149c1293-cba2-435a-9762-5c3e01757a70"
+      ],
+      "childNames": [
+        "Aiden Erazo"
+      ],
+      "childKeys": [
+        "name:aidenerazo"
+      ],
+      "recipientEmails": [
+        "stephaniealm26@gmail.com"
+      ],
+      "recommendedCanonicalRegistrationId": "reg_149c1293-cba2-435a-9762-5c3e01757a70",
+      "manualReviewReasons": []
+    },
+    {
+      "clusterKey": "b469762a6938b8890ff636c1bbbb",
+      "memberRows": [
+        23
+      ],
+      "registrationIds": [
+        "reg_f74dd9f4-8d4a-44a4-b6ec-d5c912728ac4"
+      ],
+      "childNames": [
+        "Zyhir Davis"
+      ],
+      "childKeys": [
+        "name:zyhirdavis"
+      ],
+      "recipientEmails": [
+        "andrea.davis250@gmail.com"
+      ],
+      "recommendedCanonicalRegistrationId": "reg_f74dd9f4-8d4a-44a4-b6ec-d5c912728ac4",
+      "manualReviewReasons": []
+    },
+    {
+      "clusterKey": "661b3177f3f27e1475239bba445e",
+      "memberRows": [
+        26
+      ],
+      "registrationIds": [
+        "reg_f0e07519-3083-485e-9d8d-2a4bd80d75b6"
+      ],
+      "childNames": [
+        "Kinsley Chesnutt"
+      ],
+      "childKeys": [
+        "name:kinsleychesnutt"
+      ],
+      "recipientEmails": [
+        "kimmyanne2222@gmail.com"
+      ],
+      "recommendedCanonicalRegistrationId": "reg_f0e07519-3083-485e-9d8d-2a4bd80d75b6",
+      "manualReviewReasons": []
+    },
+    {
+      "clusterKey": "b0ee47bf2474134c25e8985e9b29",
+      "memberRows": [
+        27,
+        28,
+        29,
+        30,
+        43,
+        75
+      ],
+      "registrationIds": [
+        "reg_23bfef5f-3392-46ab-bde2-f84a1c2c0d0b",
+        "reg_29755e28-3781-4d68-b836-3e0434c8288b",
+        "reg_37aeefb8-1a05-4700-9bfa-ff6941d8ce69",
+        "reg_3813ddeb-2030-4131-82b5-bba7adbf398c",
+        "reg_4953225a-fd32-43f3-b911-afce953fc5cc",
+        "reg_fb8b2118-f07f-4004-a48b-e27cef513413"
+      ],
+      "childNames": [
+        "Jude Griggs"
+      ],
+      "childKeys": [
+        "name:judegriggs"
+      ],
+      "recipientEmails": [
+        "kaizergriggs@gmail.com",
+        "cgriggs040224@gmail.com"
+      ],
+      "recommendedCanonicalRegistrationId": "reg_37aeefb8-1a05-4700-9bfa-ff6941d8ce69",
+      "manualReviewReasons": []
+    },
+    {
+      "clusterKey": "a7a73e5d26cbf45c90233fe123d4",
+      "memberRows": [
+        31,
+        32,
+        33,
+        34,
+        38,
+        88,
+        89
+      ],
+      "registrationIds": [
+        "reg_1171de2a-8cc0-4a90-a543-e7b7f2c3acaf",
+        "reg_2520e125-e457-4269-a9ac-e4341083dbf5",
+        "reg_50e57c76-6785-4e62-856e-c460474a17e8",
+        "reg_684aae52-977b-435e-bd30-3bc2563ed6e6",
+        "reg_6c590265-6332-42a9-bf7a-d8749f9cee36",
+        "reg_c2344912-16e9-49ff-b6ba-b7825374d1da",
+        "reg_fdab920c-cd7d-4a87-83d1-e9758137364c"
+      ],
+      "childNames": [
+        "Kamila Mccampbell"
+      ],
+      "childKeys": [
+        "name:kamilamccampbell"
+      ],
+      "recipientEmails": [
+        "quiannapatton7@gmail.com",
+        "t.mccampbell7@icloud.com"
+      ],
+      "recommendedCanonicalRegistrationId": "reg_2520e125-e457-4269-a9ac-e4341083dbf5",
+      "manualReviewReasons": [
+        "Participant DOB differs across attempts; merged snapshot will use the strongest current value for parent review."
+      ]
+    },
+    {
+      "clusterKey": "80b0156dfe65eb54d387e92bce1e",
+      "memberRows": [
+        35,
+        36,
+        37
+      ],
+      "registrationIds": [
+        "reg_869f5065-4fbd-4393-94d9-d2926d9489c6",
+        "reg_bf18caf4-7fd6-42ac-b3bd-ba61fbe6f76a",
+        "reg_db772755-d68c-4479-8829-41430e682bd1"
+      ],
+      "childNames": [
+        "Daniel Mcdowell",
+        "Jack McDowell"
+      ],
+      "childKeys": [
+        "name:danielmcdowell",
+        "name:jackmcdowell"
+      ],
+      "recipientEmails": [
+        "kmcdowell989@gmail.com",
+        "willmmky@gmail.com"
+      ],
+      "recommendedCanonicalRegistrationId": "reg_db772755-d68c-4479-8829-41430e682bd1",
+      "manualReviewReasons": []
+    },
+    {
+      "clusterKey": "45c0139c4f79b5e809e9907bf730",
+      "memberRows": [
+        39
+      ],
+      "registrationIds": [
+        "reg_33a5bf33-156b-48e7-ae2c-ebe5c8fee34e"
+      ],
+      "childNames": [
+        "Medley Knox"
+      ],
+      "childKeys": [
+        "name:medleyknox"
+      ],
+      "recipientEmails": [
+        "meghanfknox@gmail.com"
+      ],
+      "recommendedCanonicalRegistrationId": "reg_33a5bf33-156b-48e7-ae2c-ebe5c8fee34e",
+      "manualReviewReasons": []
+    },
+    {
+      "clusterKey": "8c599635db0f1b51b00e3c037c5f",
+      "memberRows": [
+        41,
+        42
+      ],
+      "registrationIds": [
+        "reg_748639d4-a31c-4505-864b-563793cb42b8",
+        "reg_ac4c3f32-f422-4c92-9e59-400a2a24be3a"
+      ],
+      "childNames": [
+        "Hadley McKinney"
+      ],
+      "childKeys": [
+        "name:hadleymckinney"
+      ],
+      "recipientEmails": [
+        "mlequatte93@yahoo.com"
+      ],
+      "recommendedCanonicalRegistrationId": "reg_748639d4-a31c-4505-864b-563793cb42b8",
+      "manualReviewReasons": []
+    },
+    {
+      "clusterKey": "f48dd34ff8c107480ec0972d20c1",
+      "memberRows": [
+        54,
+        55,
+        56
+      ],
+      "registrationIds": [
+        "reg_43dc980c-0b13-4a89-aa31-240afefdbd2d",
+        "reg_9166cef9-2f18-43f1-90b5-f05990186dce",
+        "reg_f0e70801-1ae8-4fda-b525-74687b5d4429"
+      ],
+      "childNames": [
+        "Legend Bailey"
+      ],
+      "childKeys": [
+        "name:legendbailey"
+      ],
+      "recipientEmails": [
+        "alejandramkattan03@gmail.com"
+      ],
+      "recommendedCanonicalRegistrationId": "reg_43dc980c-0b13-4a89-aa31-240afefdbd2d",
+      "manualReviewReasons": []
+    },
+    {
+      "clusterKey": "aad55eae04dd2f714caf58ac94b8",
+      "memberRows": [
+        59,
+        60
+      ],
+      "registrationIds": [
+        "reg_4ba420fd-fcc7-45ed-b575-467c9ab0978c",
+        "reg_c984b9b8-997a-43a5-a588-207c5043fd82"
+      ],
+      "childNames": [
+        "Horizyn White"
+      ],
+      "childKeys": [
+        "name:horizynwhite"
+      ],
+      "recipientEmails": [
+        "treshaun787@gmail.com"
+      ],
+      "recommendedCanonicalRegistrationId": "reg_4ba420fd-fcc7-45ed-b575-467c9ab09
+7:18:04 PM	Notice	Execution completed
+
+TEST_previewSelectedCase()
+
+9:29:06 PM	Notice	Execution started
+9:29:11 PM	Info	{
+  "testPlayerRow": 29,
+  "caseId": "b938f603-3828-4122-919d-fee2c3118ce5",
+  "memberRegistrationIds": [
+    "reg_23bfef5f-3392-46ab-bde2-f84a1c2c0d0b",
+    "reg_fb8b2118-f07f-4004-a48b-e27cef513413",
+    "reg_4953225a-fd32-43f3-b911-afce953fc5cc",
+    "reg_29755e28-3781-4d68-b836-3e0434c8288b"
+  ],
+  "children": [
+    "Jude Griggs"
+  ],
+  "contacts": [
+    {
+      "email": "kaizergriggs@gmail.com",
+      "name": "Kai Griggs",
+      "nameKey": "kaizergriggs",
+      "count": 3,
+      "submittedAt": 1787806721000
+    },
+    {
+      "email": "cgriggs040224@gmail.com",
+      "name": "Candace Griggs",
+      "nameKey": "candacegriggs",
+      "count": 1,
+      "submittedAt": 1787805772000
+    }
+  ],
+  "canonicalRegistrationId": "reg_29755e28-3781-4d68-b836-3e0434c8288b",
+  "manualReviewReasons": [],
+  "status": "Identified"
+}
+9:29:11 PM	Notice	Execution completed
+
+TEST_previewMergedSnapshotForSelectedCase()
+
+7:54:02 PM	Notice	Execution started
+7:54:12 PM	Info	{
+  "registrationSubmissionId": "reg_29755e28-3781-4d68-b836-3e0434c8288b",
+  "canonicalRow": 30,
+  "parent": {
+    "firstName": "Kai",
+    "lastName": "Griggs",
+    "email": "kaizergriggs@gmail.com",
+    "phone": "(270) 349-9591",
+    "street": "460 Cherry Cir",
+    "apt": "Apt 2",
+    "city": "Paducah",
+    "state": "KY",
+    "zip": "42003",
+    "dob": "05/28/1986"
+  },
+  "emergency": {
+    "sameAsParent": "yes",
+    "firstName": "",
+    "lastName": "",
+    "relationship": "",
+    "email": "",
+    "phone": "",
+    "street": "",
+    "apt": "",
+    "city": "",
+    "state": "",
+    "zip": ""
+  },
+  "players": [
+    {
+      "firstName": "Jude",
+      "lastName": "Griggs",
+      "dob": "07/26/2016",
+      "gender": "Male",
+      "grade": "4th/5th Grade Boys",
+      "jersey": "YM",
+      "shorts": "YM",
+      "socks": "YS/YM",
+      "race": "White/European",
+      "raceOther": "",
+      "favoriteClub": "Do not have a favorite MLS team",
+      "hearAbout": "Local Operator Social Media Platform"
+    }
+  ],
+  "helpChoice": "No, finish my registration",
+  "scholarshipRequested": "Yes",
+  "payment": {
+    "status": "Payment Pending",
+    "amount": "",
+    "currency": "USD",
+    "paidAt": "",
+    "transactionId": "",
+    "receiptUrl": ""
+  },
+  "resume": {
+    "caseId": "b938f603-3828-4122-919d-fee2c3118ce5",
+    "tokenId": "READ_ONLY_PREVIEW",
+    "testMode": true,
+    "releasedChildKeys": [],
+    "duplicateChildKeys": [],
+    "uncertainChildKeys": []
+  }
+}
+7:54:11 PM	Notice	Execution completed
+
+TEST_previewCachePlanForPlayerRow(<known duplicate row>)
+
+7:54:35 PM	Notice	Execution started
+7:54:41 PM	Info	{
+  "caseId": "b938f603-3828-4122-919d-fee2c3118ce5",
+  "canonical": {
+    "row": 30,
+    "registrationId": "reg_29755e28-3781-4d68-b836-3e0434c8288b"
+  },
+  "duplicateCandidates": [
+    {
+      "row": 27,
+      "registrationId": "reg_23bfef5f-3392-46ab-bde2-f84a1c2c0d0b",
+      "participants": [
+        "Jude Griggs"
+      ]
+    },
+    {
+      "row": 28,
+      "registrationId": "reg_fb8b2118-f07f-4004-a48b-e27cef513413",
+      "participants": [
+        "Jude Griggs"
+      ]
+    },
+    {
+      "row": 29,
+      "registrationId": "reg_4953225a-fd32-43f3-b911-afce953fc5cc",
+      "participants": [
+        "Jude Griggs"
+      ]
+    }
+  ],
+  "note": "Read-only preview. Actual consolidation only caches rows confirmed safe by the parent continuation token."
+}
+7:54:40 PM	Notice	Execution completed
+
+CONTINUE_sendTestForPlayerRow(29)
+
+https://script.google.com/macros/s/AKfycby2-9Q062MruTN9fiemWUatxlmTKfk5OzYbAWrUD41rLkJGGODOJBrkR_6xbwi8xS64/exec?t=eyJ0eXAiOiJjbGFpbSIsImNhc2VJZCI6ImI5MzhmNjAzLTM4MjgtNDEyMi05MTlkLWZlZTJjMzExOGNlNSIsImNhc2VWZXJzaW9uIjoxLCJjbHVzdGVyS2V5IjoiYWVhMWUwZmUwNGU0YTE0Y2NhNjkzODg5IiwicmVjaXBpZW50RW1haWwiOiJobGlnb25AZ2V0c3BhcnFkLmNvbSIsInRlc3QiOnRydWUsImlhdCI6MTc4ODY1NjY3NzU1OSwiZXhwIjoxNzg5ODY2Mjc3NTU5LCJub25jZSI6IjgxYjRmYTlhLTkxNDMtNDI4ZC1iNDkyLWQyYWU4ZjIzZjM1OSJ9.8nLwHrG5LVSS8dV3w0haJYfDo1Zv4Yk0pNIHY6bdTrg
+
+CONTINUE_sendTestForPlayerRow(26)
+
+https://quest.build/get-tickets/1598/71794/info?teamId=686&quantity=1

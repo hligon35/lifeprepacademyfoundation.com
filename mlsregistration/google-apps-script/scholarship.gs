@@ -1,5 +1,5 @@
 /**
- * Paducah GO Soccer Scholarship Acceptance Web App — Production
+ * Paducah GO Soccer Scholarship Acceptance Web App — Production (Refresh/Cleanup Compatible)
  * Keep this in its own standalone Apps Script project.
  */
 
@@ -12,6 +12,7 @@ const SCHOLARSHIP_CONFIG = Object.freeze({
   TOKEN_VALID_DAYS: 60,
   WEB_APP_URL: 'https://script.google.com/macros/s/AKfycbxe5ObXXsACvVrIw5oYEGO0kf1Nc7-8OyjnmQQd7Y3A0pkHX70c2IK90HWboJkp-2EE/exec',
   WEBHOOK_ACTION: 'send_new_scholarship_terms',
+  LINK_ACTION: 'create_scholarship_acceptance_link',
   LIVE_ARCHIVE_ACTION: 'archive_live_scholarship_application',
   WEBHOOK_TOKEN_PROPERTY: 'SCHOLARSHIP_LIVE_WEBHOOK_TOKEN',
   SIGNING_SECRET_PROPERTY: 'SCHOLARSHIP_ACCEPTANCE_SECRET',
@@ -66,6 +67,7 @@ function SCHOLARSHIP_getLiveWebhookConfiguration() {
   const result = {
     webAppUrl: scholarshipGetWebAppUrl_(),
     action: SCHOLARSHIP_CONFIG.WEBHOOK_ACTION,
+    linkAction: SCHOLARSHIP_CONFIG.LINK_ACTION,
     archiveAction: SCHOLARSHIP_CONFIG.LIVE_ARCHIVE_ACTION,
     scriptProperty: SCHOLARSHIP_CONFIG.WEBHOOK_TOKEN_PROPERTY,
     token: scholarshipGetWebhookToken_()
@@ -139,9 +141,11 @@ function doGet(e) {
 /** Receives the live notification after a new scholarship row is saved. */
 function doPost(e) {
   try {
-    const values = e && e.parameter ? e.parameter : {};
+    const values = scholarshipParsePostValues_(e);
     const action = scholarshipNormalize_(values.action);
-    if (action !== SCHOLARSHIP_CONFIG.WEBHOOK_ACTION && action !== SCHOLARSHIP_CONFIG.LIVE_ARCHIVE_ACTION) {
+    if (action !== SCHOLARSHIP_CONFIG.WEBHOOK_ACTION &&
+      action !== SCHOLARSHIP_CONFIG.LINK_ACTION &&
+      action !== SCHOLARSHIP_CONFIG.LIVE_ARCHIVE_ACTION) {
       return scholarshipJson_({ok: false, error: 'Unknown action.'});
     }
     const expected = scholarshipGetWebhookToken_();
@@ -158,7 +162,20 @@ function doPost(e) {
     }
 
     if (action === SCHOLARSHIP_CONFIG.LIVE_ARCHIVE_ACTION) {
-      return scholarshipJson_(scholarshipArchiveLiveSubmission_(registrationId, email, values.submitted_at));
+      const forceRegenerate = scholarshipBoolean_(values.force_regenerate);
+      return scholarshipJson_(scholarshipArchiveLiveSubmission_(
+        registrationId,
+        email,
+        values.accepted_at || values.submitted_at,
+        forceRegenerate
+      ));
+    }
+
+    if (action === SCHOLARSHIP_CONFIG.LINK_ACTION) {
+      return scholarshipJson_(scholarshipCreateAcceptanceLinkForRegistration_(
+        registrationId,
+        email
+      ));
     }
 
     return scholarshipJson_(scholarshipSendTermsForRegistration_(registrationId, email));
@@ -167,7 +184,43 @@ function doPost(e) {
   }
 }
 
-function scholarshipArchiveLiveSubmission_(registrationId, email, submittedAtValue) {
+function scholarshipParsePostValues_(e) {
+  const params = Object.assign({}, (e && e.parameter) || {});
+  const contents = e && e.postData && e.postData.contents
+    ? String(e.postData.contents)
+    : '';
+
+  if (contents) {
+    const contentType = String(
+      (e.postData && e.postData.type) || ''
+    ).toLowerCase();
+
+    if (contentType.indexOf('application/json') >= 0 || contents.trim().charAt(0) === '{') {
+      try {
+        const parsed = JSON.parse(contents);
+        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+          Object.keys(parsed).forEach(function(key) {
+            if (typeof params[key] === 'undefined' || params[key] === '') {
+              params[key] = parsed[key];
+            }
+          });
+        }
+      } catch (_error) {
+        // Keep normal form/query parameters if the body is not valid JSON.
+      }
+    }
+  }
+
+  return params;
+}
+
+function scholarshipBoolean_(value) {
+  if (value === true) return true;
+  const normalized = scholarshipNormalize_(value).toLowerCase();
+  return normalized === 'true' || normalized === '1' || normalized === 'yes';
+}
+
+function scholarshipArchiveLiveSubmission_(registrationId, email, submittedAtValue, forceRegenerate) {
   const lock = LockService.getScriptLock();
   lock.waitLock(30000);
   try {
@@ -190,7 +243,7 @@ function scholarshipArchiveLiveSubmission_(registrationId, email, submittedAtVal
     const existingPdfFileId = scholarshipValue_(row, map, 'scholarship_terms_pdf_file_id');
     const existingDocumentUrl = scholarshipValue_(row, map, 'scholarship_terms_document_url');
 
-    if (existingPdfUrl && existingPdfFileId && existingDocumentUrl) {
+    if (!forceRegenerate && existingPdfUrl && existingPdfFileId && existingDocumentUrl) {
       scholarshipSetRowFields_(sheet, rowNumber, map, {
         scholarship_terms_status: 'Accepted',
         scholarship_terms_accepted_at: acceptedAt,
@@ -221,7 +274,8 @@ function scholarshipArchiveLiveSubmission_(registrationId, email, submittedAtVal
         participantRecords: participants,
         acceptedAt: acceptedAt,
         acceptanceId: acceptanceId,
-        clientInfo: { source: 'live_registration_form' }
+        clientInfo: { source: forceRegenerate ? 'document_refresh' : 'live_registration_form' },
+        forceRegenerate: forceRegenerate === true
       });
     } catch (error) {
       scholarshipSetRowFields_(sheet, rowNumber, map, {
@@ -356,6 +410,35 @@ function scholarshipSendTermsForRegistration_(registrationId, email) {
   } finally {
     lock.releaseLock();
   }
+}
+
+function scholarshipCreateAcceptanceLinkForRegistration_(registrationId, email) {
+  const sheet = scholarshipGetSheet_(SCHOLARSHIP_CONFIG.SCHOLARSHIPS_SHEET);
+  scholarshipEnsureTrackingHeaders_(sheet);
+  const table = scholarshipReadTable_(sheet);
+  const map = scholarshipHeaderMap_(table.headers);
+  scholarshipRequireHeaders_(map, SCHOLARSHIP_CONFIG.REQUIRED_HEADERS);
+  const rowNumber = scholarshipFindRow_(table.rows, map, registrationId, email);
+  if (rowNumber < 2) throw new Error('The scholarship row could not be found.');
+
+  const row = table.rows[rowNumber - 2];
+  if (scholarshipChecked_(scholarshipValue_(row, map, 'scholarship_terms_exclude'))) {
+    throw new Error('The selected scholarship row is excluded from email sends.');
+  }
+
+  const record = scholarshipRowRecord_(row, map);
+  if (!record.registrationId || !scholarshipValidEmail_(record.parentEmail) ||
+      !record.participantNames) {
+    throw new Error('The row is missing its registration ID, email, or participant names.');
+  }
+
+  return {
+    ok: true,
+    row: rowNumber,
+    acceptanceUrl: scholarshipBuildAcceptanceUrl_(record),
+    parentName: record.parentName,
+    participantNames: record.participantNames
+  };
 }
 
 function scholarshipSendTermsForRow_(sheet, table, map, rowNumber, corrected, allowResend) {
@@ -586,7 +669,12 @@ function scholarshipCreateDocument_(record) {
       }
     }
     document.saveAndClose();
-    const pdf = scholarshipCreatePdf_(output, record.parentName, record.registrationId);
+    const pdf = scholarshipCreatePdf_(
+      output,
+      record.parentName,
+      record.registrationId,
+      record.forceRegenerate === true
+    );
     return {
       url: output.getUrl(),
       fileId: output.getId(),
@@ -602,11 +690,11 @@ function scholarshipCreateDocument_(record) {
   }
 }
 
-function scholarshipCreatePdf_(documentFile, parentName, registrationId) {
+function scholarshipCreatePdf_(documentFile, parentName, registrationId, forceRegenerate) {
   const folder = DriveApp.getFolderById(SCHOLARSHIP_CONFIG.APPLICATIONS_FOLDER_ID);
   const fileName = scholarshipPdfFileName_(parentName, registrationId);
   const existingFiles = folder.getFilesByName(fileName);
-  if (existingFiles.hasNext()) {
+  if (!forceRegenerate && existingFiles.hasNext()) {
     const existing = existingFiles.next();
     return {url: existing.getUrl(), fileId: existing.getId(), createdAt: new Date(existing.getDateCreated())};
   }

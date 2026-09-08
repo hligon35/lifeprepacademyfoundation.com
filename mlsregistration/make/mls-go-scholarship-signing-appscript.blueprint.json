@@ -1,0 +1,1344 @@
+{
+    "name": "MLS GO - Scholarship Signing via Apps Script",
+    "flow": [
+        {
+            "id": 1,
+            "module": "google-sheets:filterRows",
+            "version": 2,
+            "parameters": {
+                "__IMTCONN__": 10945462
+            },
+            "mapper": {
+                "from": "drive",
+                "valueRenderOption": "FORMATTED_VALUE",
+                "dateTimeRenderOption": "FORMATTED_STRING",
+                "limit": "1",
+                "spreadsheetId": "1EIG6F00-mVhT9ws0nS3pJBrp9Y2mPH87p6UyLkWtKT4",
+                "sheetId": "Scholarships",
+                "includesHeaders": true,
+                "tableFirstRow": "A1:Z1",
+                "filter": [
+                    [
+                        {
+                            "a": "B",
+                            "o": "exist"
+                        },
+                        {
+                            "a": "F",
+                            "o": "exist"
+                        },
+                        {
+                            "a": "I",
+                            "o": "exist"
+                        },
+                        {
+                            "a": "J",
+                            "o": "boolean:notequal",
+                            "b": "true"
+                        },
+                        {
+                            "a": "K",
+                            "o": "text:notequal:ci",
+                            "b": "Sent"
+                        },
+                        {
+                            "a": "K",
+                            "o": "text:notequal:ci",
+                            "b": "Accepted"
+                        },
+                        {
+                            "a": "W",
+                            "o": "notexist"
+                        }
+                    ]
+                ],
+                "orderBy": "__ROW_NUMBER__",
+                "sortOrder": "asc",
+                "fieldType": "string"
+            },
+            "metadata": {
+                "designer": {
+                    "x": 0,
+                    "y": 0
+                },
+                "restore": {
+                    "parameters": {
+                        "__IMTCONN__": {
+                            "label": "LifePrep Academy Foundation (bhall@lifeprepacademyfoundation.com)",
+                            "data": {
+                                "scoped": "true",
+                                "connection": "google"
+                            }
+                        }
+                    },
+                    "expect": {
+                        "from": {
+                            "label": "Select from My Drive"
+                        },
+                        "valueRenderOption": {
+                            "mode": "chose",
+                            "label": "Formatted value"
+                        },
+                        "dateTimeRenderOption": {
+                            "mode": "chose",
+                            "label": "Formatted string"
+                        },
+                        "spreadsheetId": {
+                            "mode": "chose",
+                            "label": "Paducah MLS GO Soccer Registration"
+                        },
+                        "sheetId": {
+                            "mode": "chose",
+                            "label": "Scholarships"
+                        },
+                        "includesHeaders": {
+                            "mode": "chose",
+                            "label": "Yes"
+                        },
+                        "tableFirstRow": {
+                            "label": "A-Z"
+                        },
+                        "orderBy": {
+                            "mode": "chose",
+                            "label": "Row number"
+                        },
+                        "sortOrder": {
+                            "mode": "chose",
+                            "label": "Ascending"
+                        },
+                        "fieldType": {
+                            "mode": "chose",
+                            "label": "String"
+                        }
+                    }
+                },
+                "parameters": [
+                    {
+                        "name": "__IMTCONN__",
+                        "type": "account:google",
+                        "label": "Connection",
+                        "required": true
+                    }
+                ],
+                "expect": [
+                    {
+                        "name": "from",
+                        "type": "select",
+                        "label": "Search Method",
+                        "required": true,
+                        "validate": {
+                            "enum": [
+                                "drive",
+                                "share"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "valueRenderOption",
+                        "type": "select",
+                        "label": "Value render option",
+                        "validate": {
+                            "enum": [
+                                "FORMATTED_VALUE",
+                                "UNFORMATTED_VALUE",
+                                "FORMULA"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "dateTimeRenderOption",
+                        "type": "select",
+                        "label": "Date and time render option",
+                        "validate": {
+                            "enum": [
+                                "SERIAL_NUMBER",
+                                "FORMATTED_STRING"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "limit",
+                        "type": "uinteger",
+                        "label": "Limit"
+                    },
+                    {
+                        "name": "spreadsheetId",
+                        "type": "select",
+                        "label": "Spreadsheet Name",
+                        "required": true
+                    },
+                    {
+                        "name": "sheetId",
+                        "type": "select",
+                        "label": "Sheet Name",
+                        "required": true
+                    },
+                    {
+                        "name": "includesHeaders",
+                        "type": "select",
+                        "label": "Table contains headers",
+                        "required": true,
+                        "validate": {
+                            "enum": [
+                                true,
+                                false
+                            ]
+                        }
+                    },
+                    {
+                        "name": "tableFirstRow",
+                        "type": "select",
+                        "label": "Column range",
+                        "required": true,
+                        "validate": {
+                            "enum": [
+                                "A1:Z1",
+                                "A1:BZ1",
+                                "A1:CZ1",
+                                "A1:DZ1",
+                                "A1:MZ1",
+                                "A1:ZZ1",
+                                "A1:AZZ1",
+                                "A1:BZZ1",
+                                "A1:CZZ1",
+                                "A1:DZZ1",
+                                "A1:MZZ1",
+                                "A1:ZZZ1"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "filter",
+                        "type": "filter",
+                        "label": "Filter",
+                        "options": "rpc://google-sheets/2/rpcGetFilterKeys?includesHeaders=true"
+                    },
+                    {
+                        "name": "orderBy",
+                        "type": "select",
+                        "label": "Order by"
+                    },
+                    {
+                        "name": "sortOrder",
+                        "type": "select",
+                        "label": "Sort order",
+                        "validate": {
+                            "enum": [
+                                "asc",
+                                "desc"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "fieldType",
+                        "type": "select",
+                        "label": "Field Type",
+                        "validate": {
+                            "enum": [
+                                "string",
+                                "number",
+                                "date"
+                            ]
+                        }
+                    }
+                ],
+                "interface": [
+                    {
+                        "name": "__IMTLENGTH__",
+                        "label": "Total number of bundles",
+                        "type": "uinteger"
+                    },
+                    {
+                        "name": "__IMTINDEX__",
+                        "label": "Bundle order position",
+                        "type": "uinteger"
+                    },
+                    {
+                        "name": "__ROW_NUMBER__",
+                        "label": "Row number",
+                        "type": "number"
+                    },
+                    {
+                        "name": "__SPREADSHEET_ID__",
+                        "label": "Spreadsheet ID",
+                        "type": "text"
+                    },
+                    {
+                        "name": "__SHEET__",
+                        "label": "Sheet",
+                        "type": "text"
+                    },
+                    {
+                        "name": "0",
+                        "label": "submitted_at (A)",
+                        "type": "text"
+                    },
+                    {
+                        "name": "1",
+                        "label": "registration_submission_id (B)",
+                        "type": "text"
+                    },
+                    {
+                        "name": "2",
+                        "label": "page_url (C)",
+                        "type": "text"
+                    },
+                    {
+                        "name": "3",
+                        "label": "parent_first_name (D)",
+                        "type": "text"
+                    },
+                    {
+                        "name": "4",
+                        "label": "parent_last_name (E)",
+                        "type": "text"
+                    },
+                    {
+                        "name": "5",
+                        "label": "parent_email (F)",
+                        "type": "text"
+                    },
+                    {
+                        "name": "6",
+                        "label": "parent_phone (G)",
+                        "type": "text"
+                    },
+                    {
+                        "name": "7",
+                        "label": "scholarship_requested (H)",
+                        "type": "text"
+                    },
+                    {
+                        "name": "8",
+                        "label": "participant_names (I)",
+                        "type": "text"
+                    },
+                    {
+                        "name": "9",
+                        "label": "scholarship_terms_exclude (J)",
+                        "type": "text"
+                    },
+                    {
+                        "name": "10",
+                        "label": "scholarship_terms_status (K)",
+                        "type": "text"
+                    },
+                    {
+                        "name": "11",
+                        "label": "scholarship_terms_sent_at (L)",
+                        "type": "text"
+                    },
+                    {
+                        "name": "12",
+                        "label": "scholarship_terms_accepted_at (M)",
+                        "type": "text"
+                    },
+                    {
+                        "name": "13",
+                        "label": "scholarship_terms_parent_name (N)",
+                        "type": "text"
+                    },
+                    {
+                        "name": "14",
+                        "label": "scholarship_terms_participant_names (O)",
+                        "type": "text"
+                    },
+                    {
+                        "name": "15",
+                        "label": "scholarship_terms_grades (P)",
+                        "type": "text"
+                    },
+                    {
+                        "name": "16",
+                        "label": "scholarship_terms_version (Q)",
+                        "type": "text"
+                    },
+                    {
+                        "name": "17",
+                        "label": "scholarship_terms_acceptance_id (R)",
+                        "type": "text"
+                    },
+                    {
+                        "name": "18",
+                        "label": "scholarship_terms_document_url (S)",
+                        "type": "text"
+                    },
+                    {
+                        "name": "19",
+                        "label": "scholarship_terms_document_file_id (T)",
+                        "type": "text"
+                    },
+                    {
+                        "name": "20",
+                        "label": "scholarship_terms_document_created_at (U)",
+                        "type": "text"
+                    },
+                    {
+                        "name": "21",
+                        "label": "scholarship_terms_document_participant_count (V)",
+                        "type": "text"
+                    },
+                    {
+                        "name": "22",
+                        "label": "scholarship_terms_pdf_url (W)",
+                        "type": "text"
+                    },
+                    {
+                        "name": "23",
+                        "label": "scholarship_terms_pdf_file_id (X)",
+                        "type": "text"
+                    },
+                    {
+                        "name": "24",
+                        "label": "scholarship_terms_pdf_created_at (Y)",
+                        "type": "text"
+                    },
+                    {
+                        "name": "25",
+                        "label": "scholarship_terms_error (Z)",
+                        "type": "text"
+                    }
+                ]
+            }
+        },
+        {
+            "id": 2,
+            "module": "http:ActionSendData",
+            "version": 3,
+            "parameters": {
+                "handleErrors": true,
+                "useNewZLibDeCompress": true
+            },
+            "mapper": {
+                "url": "https://script.google.com/macros/s/AKfycbx1B_NuTAUDW86CFr0WQE8tYIZE1aVEGUcPzkvng0CBUSBxpmUJ_JKlKyRaLW_sK439dA/exec",
+                "serializeUrl": false,
+                "method": "post",
+                "headers": [
+                    {
+                        "name": "Content-Type",
+                        "value": "application/json"
+                    }
+                ],
+                "qs": [],
+                "bodyType": "raw",
+                "parseResponse": true,
+                "authUser": "",
+                "authPass": "",
+                "timeout": "40",
+                "shareCookies": false,
+                "ca": "",
+                "rejectUnauthorized": true,
+                "followRedirect": true,
+                "useQuerystring": false,
+                "gzip": true,
+                "useMtls": false,
+                "contentType": "",
+                "data": "{\"action\":\"create_scholarship_acceptance_link\",\"webhook_token\":\"REPLACE_WITH_SCHOLARSHIP_LIVE_WEBHOOK_TOKEN\",\"registration_submission_id\":\"{{1.`1`}}\",\"parent_email\":\"{{lower(trim(1.`5`))}}\"}",
+                "followAllRedirects": true
+            },
+            "metadata": {
+                "designer": {
+                    "x": 350,
+                    "y": 0
+                },
+                "restore": {
+                    "expect": {
+                        "method": {
+                            "mode": "chose",
+                            "label": "POST"
+                        },
+                        "headers": {
+                            "mode": "chose",
+                            "items": [
+                                null
+                            ]
+                        },
+                        "qs": {
+                            "mode": "chose"
+                        },
+                        "bodyType": {
+                            "label": "Raw"
+                        },
+                        "contentType": {
+                            "label": "Empty"
+                        }
+                    }
+                },
+                "parameters": [
+                    {
+                        "name": "handleErrors",
+                        "type": "boolean",
+                        "label": "Evaluate all states as errors (except for 2xx and 3xx )",
+                        "required": true
+                    },
+                    {
+                        "name": "useNewZLibDeCompress",
+                        "type": "hidden"
+                    }
+                ],
+                "expect": [
+                    {
+                        "name": "url",
+                        "type": "url",
+                        "label": "URL",
+                        "required": true
+                    },
+                    {
+                        "name": "serializeUrl",
+                        "type": "boolean",
+                        "label": "Serialize URL",
+                        "required": true
+                    },
+                    {
+                        "name": "method",
+                        "type": "select",
+                        "label": "Method",
+                        "required": true,
+                        "validate": {
+                            "enum": [
+                                "get",
+                                "head",
+                                "post",
+                                "put",
+                                "patch",
+                                "delete",
+                                "options"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "headers",
+                        "type": "array",
+                        "label": "Headers",
+                        "spec": [
+                            {
+                                "name": "name",
+                                "label": "Name",
+                                "type": "text",
+                                "required": true
+                            },
+                            {
+                                "name": "value",
+                                "label": "Value",
+                                "type": "text"
+                            }
+                        ]
+                    },
+                    {
+                        "name": "qs",
+                        "type": "array",
+                        "label": "Query String",
+                        "spec": [
+                            {
+                                "name": "name",
+                                "label": "Name",
+                                "type": "text",
+                                "required": true
+                            },
+                            {
+                                "name": "value",
+                                "label": "Value",
+                                "type": "text"
+                            }
+                        ]
+                    },
+                    {
+                        "name": "bodyType",
+                        "type": "select",
+                        "label": "Body type",
+                        "validate": {
+                            "enum": [
+                                "raw",
+                                "x_www_form_urlencoded",
+                                "multipart_form_data"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "parseResponse",
+                        "type": "boolean",
+                        "label": "Parse response",
+                        "required": true
+                    },
+                    {
+                        "name": "authUser",
+                        "type": "text",
+                        "label": "User name"
+                    },
+                    {
+                        "name": "authPass",
+                        "type": "password",
+                        "label": "Password"
+                    },
+                    {
+                        "name": "timeout",
+                        "type": "uinteger",
+                        "label": "Timeout",
+                        "validate": {
+                            "max": 300,
+                            "min": 1
+                        }
+                    },
+                    {
+                        "name": "shareCookies",
+                        "type": "boolean",
+                        "label": "Share cookies with other HTTP modules",
+                        "required": true
+                    },
+                    {
+                        "name": "ca",
+                        "type": "cert",
+                        "label": "Self-signed certificate"
+                    },
+                    {
+                        "name": "rejectUnauthorized",
+                        "type": "boolean",
+                        "label": "Reject connections that are using unverified (self-signed) certificates",
+                        "required": true
+                    },
+                    {
+                        "name": "followRedirect",
+                        "type": "boolean",
+                        "label": "Follow redirect",
+                        "required": true
+                    },
+                    {
+                        "name": "useQuerystring",
+                        "type": "boolean",
+                        "label": "Disable serialization of multiple same query string keys as arrays",
+                        "required": true
+                    },
+                    {
+                        "name": "gzip",
+                        "type": "boolean",
+                        "label": "Request compressed content",
+                        "required": true
+                    },
+                    {
+                        "name": "useMtls",
+                        "type": "boolean",
+                        "label": "Use Mutual TLS",
+                        "required": true
+                    },
+                    {
+                        "name": "contentType",
+                        "type": "select",
+                        "label": "Content type",
+                        "validate": {
+                            "enum": [
+                                "text/plain",
+                                "application/json",
+                                "application/xml",
+                                "text/xml",
+                                "text/html",
+                                "custom"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "data",
+                        "type": "buffer",
+                        "label": "Request content"
+                    },
+                    {
+                        "name": "followAllRedirects",
+                        "type": "boolean",
+                        "label": "Follow all redirect",
+                        "required": true
+                    }
+                ],
+                "interface": [
+                    {
+                        "name": "statusCode",
+                        "label": "Status code",
+                        "type": "number"
+                    },
+                    {
+                        "name": "headers",
+                        "label": "Headers",
+                        "type": "collection"
+                    },
+                    {
+                        "name": "data",
+                        "label": "Data",
+                        "type": "collection",
+                        "spec": [
+                            {
+                                "name": "ok",
+                                "label": "ok",
+                                "type": "boolean"
+                            },
+                            {
+                                "name": "row",
+                                "label": "row",
+                                "type": "number"
+                            },
+                            {
+                                "name": "acceptanceUrl",
+                                "label": "acceptanceUrl",
+                                "type": "text"
+                            },
+                            {
+                                "name": "parentName",
+                                "label": "parentName",
+                                "type": "text"
+                            },
+                            {
+                                "name": "participantNames",
+                                "label": "participantNames",
+                                "type": "text"
+                            },
+                            {
+                                "name": "error",
+                                "label": "error",
+                                "type": "text"
+                            }
+                        ]
+                    }
+                ]
+            }
+        },
+        {
+            "id": 3,
+            "module": "google-email:sendAnEmail",
+            "version": 4,
+            "parameters": {
+                "__IMTCONN__": 10945640
+            },
+            "filter": {
+                "name": "Apps Script returned a signed scholarship URL",
+                "conditions": [
+                    [
+                        {
+                            "a": "{{2.data.ok}}",
+                            "o": "equal",
+                            "b": true
+                        },
+                        {
+                            "a": "{{2.data.acceptanceUrl}}",
+                            "o": "exist"
+                        }
+                    ]
+                ]
+            },
+            "mapper": {
+                "to": [
+                    "hligon@getsparqd.com"
+                ],
+                "subject": "ACTION NEEDED! Please read and accept the terms for the Hardship Scholarship.",
+                "bodyType": "rawHtml",
+                "from": "\"Youth Department\" <youthprograms@lifeprepacademyfoundation.com>",
+                "content": "<!DOCTYPE html><html><head><meta charset=\"UTF-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1.0\"><title>Review Your Scholarship Guidelines</title></head><body style=\"margin:0;padding:0;background-color:#f1f4f3;font-family:Arial,Helvetica,sans-serif\"><table role=\"presentation\" width=\"100%\" cellspacing=\"0\" cellpadding=\"0\" border=\"0\" style=\"width:100%;background-color:#f1f4f3\"><tr><td align=\"center\" style=\"padding:24px 12px\"><table role=\"presentation\" width=\"600\" cellspacing=\"0\" cellpadding=\"0\" border=\"0\" style=\"width:100%;max-width:600px;background-color:#fff;border-radius:14px;overflow:hidden\"><tr><td style=\"padding:0;line-height:0\"><img src=\"https://mlsregistration.lifeprepacademyfoundation.com/LPAFxPGS.PNG\" alt=\"LifePrep Academy Foundation - Paducah GO Soccer\" width=\"600\" style=\"display:block;width:100%;max-width:600px;height:auto;border:0\"></td></tr><tr><td style=\"padding:32px 34px 40px\"><h1 style=\"margin:0 0 20px;font-size:27px;line-height:1.25;color:#20477d\">Review your scholarship guidelines</h1><p style=\"font-size:14px;line-height:1.5;color:#222\">Hello {{1.`3`}},</p><p style=\"font-size:14px;line-height:1.5;color:#222\">Thank you for applying for a Paducah GO Soccer scholarship for <strong>{{1.`8`}}</strong>.</p><p style=\"font-size:14px;line-height:1.5;color:#222\">To continue the scholarship process, please review and accept the Paducah GO Soccer Scholarship Guidelines. Your personalized agreement already includes the information provided in your application.</p><p style=\"font-size:14px;line-height:1.5;color:#222\">Please use the button below to review and accept the agreement:</p><table role=\"presentation\" cellspacing=\"0\" cellpadding=\"0\" border=\"0\" style=\"margin:0 0 16px\"><tr><td align=\"center\" bgcolor=\"#08653f\" style=\"border-radius:7px\"><a href=\"{{2.data.acceptanceUrl}}\" target=\"_blank\" style=\"display:inline-block;padding:15px 23px;font-size:14px;line-height:18px;font-weight:700;color:#fff;text-decoration:none;background-color:#08653f;border-radius:7px\">Review and Accept Scholarship Guidelines</a></td></tr></table><p style=\"font-size:14px;line-height:1.5;color:#222\">If you have any questions or need assistance, please contact us.</p><p style=\"margin:0;font-size:14px;line-height:1.45;color:#222\">Thank you,<br><strong>Paducah GO Soccer</strong><br>LifePrep Academy Foundation</p></td></tr></table></td></tr></table></body></html>"
+            },
+            "metadata": {
+                "designer": {
+                    "x": 700,
+                    "y": 0
+                },
+                "restore": {
+                    "parameters": {
+                        "__IMTCONN__": {
+                            "label": "LifePrep Academy Foundation (bhall@lifeprepacademyfoundation.com)",
+                            "data": {
+                                "scoped": "true",
+                                "connection": "google-email"
+                            }
+                        }
+                    },
+                    "expect": {
+                        "to": {
+                            "mode": "chose",
+                            "items": [
+                                null
+                            ]
+                        },
+                        "bodyType": {
+                            "label": "Raw HTML"
+                        },
+                        "attachments": {
+                            "mode": "chose"
+                        },
+                        "from": {
+                            "mode": "chose",
+                            "label": "\"Youth Department\" <youthprograms@lifeprepacademyfoundation.com>"
+                        },
+                        "cc": {
+                            "mode": "chose"
+                        },
+                        "bcc": {
+                            "mode": "chose"
+                        },
+                        "emailHeaders": {
+                            "mode": "chose"
+                        }
+                    }
+                },
+                "parameters": [
+                    {
+                        "name": "__IMTCONN__",
+                        "type": "account:google-email",
+                        "label": "Connection",
+                        "required": true
+                    }
+                ],
+                "expect": [
+                    {
+                        "name": "to",
+                        "type": "array",
+                        "label": "To",
+                        "required": true,
+                        "spec": {
+                            "type": "email",
+                            "label": "Recipient email address",
+                            "required": true,
+                            "validate": true,
+                            "name": "value"
+                        }
+                    },
+                    {
+                        "name": "subject",
+                        "type": "text",
+                        "label": "Subject"
+                    },
+                    {
+                        "name": "bodyType",
+                        "type": "select",
+                        "label": "Body type",
+                        "required": true,
+                        "validate": {
+                            "enum": [
+                                "rawHtml",
+                                "collection"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "attachments",
+                        "type": "array",
+                        "label": "Attachments",
+                        "spec": {
+                            "spec": [
+                                {
+                                    "name": "filename",
+                                    "type": "filename",
+                                    "label": "File name",
+                                    "required": true,
+                                    "semantic": "file:name"
+                                },
+                                {
+                                    "name": "data",
+                                    "type": "buffer",
+                                    "label": "Data",
+                                    "required": true,
+                                    "semantic": "file:data"
+                                }
+                            ],
+                            "type": "collection",
+                            "label": "Attachment",
+                            "name": "value"
+                        }
+                    },
+                    {
+                        "name": "from",
+                        "type": "select",
+                        "label": "From"
+                    },
+                    {
+                        "name": "cc",
+                        "type": "array",
+                        "label": "CC recipients",
+                        "spec": {
+                            "type": "email",
+                            "label": "Recipient email address",
+                            "name": "value"
+                        }
+                    },
+                    {
+                        "name": "bcc",
+                        "type": "array",
+                        "label": "BCC recipients",
+                        "spec": {
+                            "type": "email",
+                            "label": "Recipient email address",
+                            "name": "value"
+                        }
+                    },
+                    {
+                        "name": "emailHeaders",
+                        "type": "array",
+                        "label": "Additional email headers",
+                        "spec": {
+                            "spec": [
+                                {
+                                    "name": "key",
+                                    "type": "text",
+                                    "label": "Key",
+                                    "required": true
+                                },
+                                {
+                                    "name": "value",
+                                    "type": "text",
+                                    "label": "Value"
+                                }
+                            ],
+                            "type": "collection",
+                            "label": "Email header",
+                            "name": "value"
+                        }
+                    },
+                    {
+                        "name": "content",
+                        "type": "text",
+                        "label": "Content"
+                    }
+                ],
+                "advanced": true
+            }
+        },
+        {
+            "id": 4,
+            "module": "google-sheets:updateRow",
+            "version": 2,
+            "parameters": {
+                "__IMTCONN__": 10945462
+            },
+            "mapper": {
+                "mode": "select",
+                "valueInputOption": "USER_ENTERED",
+                "from": "drive",
+                "spreadsheetId": "/1EIG6F00-mVhT9ws0nS3pJBrp9Y2mPH87p6UyLkWtKT4",
+                "sheetId": "Scholarships",
+                "rowNumber": "{{1.__ROW_NUMBER__}}",
+                "includesHeaders": true,
+                "useColumnHeaders": false,
+                "values": {
+                    "10": "Sent",
+                    "11": "{{formatDate(now; \"YYYY-MM-DDTHH:mm:ss.SSS[Z]\"; \"UTC\")}}",
+                    "13": "{{2.data.parentName}}",
+                    "14": "{{2.data.participantNames}}",
+                    "16": "1.0",
+                    "25": ""
+                }
+            },
+            "metadata": {
+                "designer": {
+                    "x": 1050,
+                    "y": 0
+                },
+                "restore": {
+                    "parameters": {
+                        "__IMTCONN__": {
+                            "label": "LifePrep Academy Foundation (bhall@lifeprepacademyfoundation.com)",
+                            "data": {
+                                "scoped": "true",
+                                "connection": "google"
+                            }
+                        }
+                    },
+                    "expect": {
+                        "mode": {
+                            "label": "Search by path"
+                        },
+                        "valueInputOption": {
+                            "mode": "chose",
+                            "label": "User entered"
+                        },
+                        "from": {
+                            "label": "My Drive"
+                        },
+                        "spreadsheetId": {
+                            "path": [
+                                "1EIG6F00-mVhT9ws0nS3pJBrp9Y2mPH87p6UyLkWtKT4"
+                            ]
+                        },
+                        "sheetId": {
+                            "label": "Scholarships"
+                        },
+                        "includesHeaders": {
+                            "label": "Yes"
+                        },
+                        "useColumnHeaders": {
+                            "label": "No"
+                        }
+                    }
+                },
+                "parameters": [
+                    {
+                        "name": "__IMTCONN__",
+                        "type": "account:google",
+                        "label": "Connection",
+                        "required": true
+                    }
+                ],
+                "expect": [
+                    {
+                        "name": "mode",
+                        "type": "select",
+                        "label": "Search Method",
+                        "required": true,
+                        "validate": {
+                            "enum": [
+                                "select",
+                                "fromAll",
+                                "map"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "valueInputOption",
+                        "type": "select",
+                        "label": "Value input option",
+                        "required": true,
+                        "validate": {
+                            "enum": [
+                                "USER_ENTERED",
+                                "RAW"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "from",
+                        "type": "select",
+                        "label": "Drive",
+                        "required": true,
+                        "validate": {
+                            "enum": [
+                                "drive",
+                                "share",
+                                "team"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "spreadsheetId",
+                        "type": "file",
+                        "label": "Spreadsheet Name",
+                        "required": true
+                    },
+                    {
+                        "name": "sheetId",
+                        "type": "select",
+                        "label": "Sheet Name",
+                        "required": true
+                    },
+                    {
+                        "name": "rowNumber",
+                        "type": "uinteger",
+                        "label": "Row number",
+                        "required": true
+                    },
+                    {
+                        "name": "includesHeaders",
+                        "type": "select",
+                        "label": "Table contains headers",
+                        "required": true,
+                        "validate": {
+                            "enum": [
+                                true,
+                                false
+                            ]
+                        }
+                    },
+                    {
+                        "name": "useColumnHeaders",
+                        "type": "select",
+                        "label": "Use column headers as IDs of the columns",
+                        "required": true,
+                        "validate": {
+                            "enum": [
+                                true,
+                                false
+                            ]
+                        }
+                    },
+                    {
+                        "name": "values",
+                        "type": "collection",
+                        "label": "Values in columns",
+                        "metadata": [
+                            [
+                                [
+                                    "submitted_at",
+                                    "registration_submission_id",
+                                    "page_url",
+                                    "parent_first_name",
+                                    "parent_last_name",
+                                    "parent_email",
+                                    "parent_phone",
+                                    "scholarship_requested",
+                                    "participant_names",
+                                    "scholarship_terms_exclude",
+                                    "scholarship_terms_status",
+                                    "scholarship_terms_sent_at",
+                                    "scholarship_terms_accepted_at",
+                                    "scholarship_terms_parent_name",
+                                    "scholarship_terms_participant_names",
+                                    "scholarship_terms_grades",
+                                    "scholarship_terms_version",
+                                    "scholarship_terms_acceptance_id",
+                                    "scholarship_terms_document_url",
+                                    "scholarship_terms_document_file_id",
+                                    "scholarship_terms_document_created_at",
+                                    "scholarship_terms_document_participant_count",
+                                    "scholarship_terms_pdf_url",
+                                    "scholarship_terms_pdf_file_id",
+                                    "scholarship_terms_pdf_created_at",
+                                    "scholarship_terms_error",
+                                    "scholarship_terms_live_test",
+                                    "form_type",
+                                    "scholarship_level",
+                                    "scholarship_household_size",
+                                    "scholarship_household_income",
+                                    "scholarship_eligibility",
+                                    "scholarship_circumstances",
+                                    "scholarship_contribution_amount",
+                                    "scholarship_participation_commitment",
+                                    "scholarship_parent_acknowledgement",
+                                    "scholarship_guidelines_accepted",
+                                    "Scholarship Document Status",
+                                    "Scholarship Document File ID",
+                                    "Scholarship Document PDF URL",
+                                    "Scholarship Document Generated At",
+                                    "Scholarship Document Error"
+                                ]
+                            ]
+                        ],
+                        "spec": [
+                            {
+                                "name": "0",
+                                "type": "text",
+                                "label": "submitted_at (A)"
+                            },
+                            {
+                                "name": "1",
+                                "type": "text",
+                                "label": "registration_submission_id (B)"
+                            },
+                            {
+                                "name": "2",
+                                "type": "text",
+                                "label": "page_url (C)"
+                            },
+                            {
+                                "name": "3",
+                                "type": "text",
+                                "label": "parent_first_name (D)"
+                            },
+                            {
+                                "name": "4",
+                                "type": "text",
+                                "label": "parent_last_name (E)"
+                            },
+                            {
+                                "name": "5",
+                                "type": "text",
+                                "label": "parent_email (F)"
+                            },
+                            {
+                                "name": "6",
+                                "type": "text",
+                                "label": "parent_phone (G)"
+                            },
+                            {
+                                "name": "7",
+                                "type": "text",
+                                "label": "scholarship_requested (H)"
+                            },
+                            {
+                                "name": "8",
+                                "type": "text",
+                                "label": "participant_names (I)"
+                            },
+                            {
+                                "name": "9",
+                                "type": "text",
+                                "label": "scholarship_terms_exclude (J)"
+                            },
+                            {
+                                "name": "10",
+                                "type": "text",
+                                "label": "scholarship_terms_status (K)"
+                            },
+                            {
+                                "name": "11",
+                                "type": "text",
+                                "label": "scholarship_terms_sent_at (L)"
+                            },
+                            {
+                                "name": "12",
+                                "type": "text",
+                                "label": "scholarship_terms_accepted_at (M)"
+                            },
+                            {
+                                "name": "13",
+                                "type": "text",
+                                "label": "scholarship_terms_parent_name (N)"
+                            },
+                            {
+                                "name": "14",
+                                "type": "text",
+                                "label": "scholarship_terms_participant_names (O)"
+                            },
+                            {
+                                "name": "15",
+                                "type": "text",
+                                "label": "scholarship_terms_grades (P)"
+                            },
+                            {
+                                "name": "16",
+                                "type": "text",
+                                "label": "scholarship_terms_version (Q)"
+                            },
+                            {
+                                "name": "17",
+                                "type": "text",
+                                "label": "scholarship_terms_acceptance_id (R)"
+                            },
+                            {
+                                "name": "18",
+                                "type": "text",
+                                "label": "scholarship_terms_document_url (S)"
+                            },
+                            {
+                                "name": "19",
+                                "type": "text",
+                                "label": "scholarship_terms_document_file_id (T)"
+                            },
+                            {
+                                "name": "20",
+                                "type": "text",
+                                "label": "scholarship_terms_document_created_at (U)"
+                            },
+                            {
+                                "name": "21",
+                                "type": "text",
+                                "label": "scholarship_terms_document_participant_count (V)"
+                            },
+                            {
+                                "name": "22",
+                                "type": "text",
+                                "label": "scholarship_terms_pdf_url (W)"
+                            },
+                            {
+                                "name": "23",
+                                "type": "text",
+                                "label": "scholarship_terms_pdf_file_id (X)"
+                            },
+                            {
+                                "name": "24",
+                                "type": "text",
+                                "label": "scholarship_terms_pdf_created_at (Y)"
+                            },
+                            {
+                                "name": "25",
+                                "type": "text",
+                                "label": "scholarship_terms_error (Z)"
+                            },
+                            {
+                                "name": "26",
+                                "type": "text",
+                                "label": "scholarship_terms_live_test (AA)"
+                            },
+                            {
+                                "name": "27",
+                                "type": "text",
+                                "label": "form_type (AB)"
+                            },
+                            {
+                                "name": "28",
+                                "type": "text",
+                                "label": "scholarship_level (AC)"
+                            },
+                            {
+                                "name": "29",
+                                "type": "text",
+                                "label": "scholarship_household_size (AD)"
+                            },
+                            {
+                                "name": "30",
+                                "type": "text",
+                                "label": "scholarship_household_income (AE)"
+                            },
+                            {
+                                "name": "31",
+                                "type": "text",
+                                "label": "scholarship_eligibility (AF)"
+                            },
+                            {
+                                "name": "32",
+                                "type": "text",
+                                "label": "scholarship_circumstances (AG)"
+                            },
+                            {
+                                "name": "33",
+                                "type": "text",
+                                "label": "scholarship_contribution_amount (AH)"
+                            },
+                            {
+                                "name": "34",
+                                "type": "text",
+                                "label": "scholarship_participation_commitment (AI)"
+                            },
+                            {
+                                "name": "35",
+                                "type": "text",
+                                "label": "scholarship_parent_acknowledgement (AJ)"
+                            },
+                            {
+                                "name": "36",
+                                "type": "text",
+                                "label": "scholarship_guidelines_accepted (AK)"
+                            },
+                            {
+                                "name": "37",
+                                "type": "text",
+                                "label": "Scholarship Document Status (AL)"
+                            },
+                            {
+                                "name": "38",
+                                "type": "text",
+                                "label": "Scholarship Document File ID (AM)"
+                            },
+                            {
+                                "name": "39",
+                                "type": "text",
+                                "label": "Scholarship Document PDF URL (AN)"
+                            },
+                            {
+                                "name": "40",
+                                "type": "text",
+                                "label": "Scholarship Document Generated At (AO)"
+                            },
+                            {
+                                "name": "41",
+                                "type": "text",
+                                "label": "Scholarship Document Error (AP)"
+                            }
+                        ]
+                    }
+                ]
+            }
+        }
+    ],
+    "metadata": {
+        "instant": false,
+        "version": 1,
+        "scenario": {
+            "roundtrips": 1,
+            "maxErrors": 3,
+            "autoCommit": true,
+            "autoCommitTriggerLast": true,
+            "sequential": true,
+            "slots": null,
+            "confidential": true,
+            "dataloss": false,
+            "dlq": false,
+            "freshVariables": false
+        },
+        "designer": {
+            "orphans": []
+        },
+        "zone": "us2.make.com",
+        "notes": []
+    }
+}

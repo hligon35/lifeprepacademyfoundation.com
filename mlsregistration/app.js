@@ -462,6 +462,14 @@
     }
 
     applyRegistrationResumeContext(context);
+    if (context.resume?.agreementOnly && initialSectionId === "agreements-section") {
+      completedRegistrationData = collectRegistrationData();
+      completedRegistrationData.registrationSubmissionId = registrationSubmissionId;
+      playerSubmitted = true;
+      lockFlowOptionsFromRegistration(completedRegistrationData);
+      advanceToStage(STAGES.PLAYER_AGREEMENT);
+      renderWizard();
+    }
     ensureWithdrawalPanel(context);
     if (registrationResumeState.testMode) showRegistrationResumeTestBanner();
 
@@ -535,7 +543,7 @@
   }
 
   function ensureWithdrawalPanel(context) {
-    if (!registrationResumeState?.token || standaloneFlow) return;
+    if (!registrationResumeState?.token || standaloneFlow || context.resume?.agreementOnly) return;
 
     let panel = document.getElementById("withdraw-registration-panel");
     if (!panel) {
@@ -2633,6 +2641,11 @@
   }
 
   async function advanceAfterStageSuccess(stage) {
+    if (stage === STAGES.PLAYER_AGREEMENT && registrationResumeState?.context?.resume?.agreementOnly) {
+      advanceToStage(STAGES.THANK_YOU);
+      return;
+    }
+
     if (stage === STAGES.PLAYER_REGISTRATION) {
       lockFlowOptionsFromRegistration(completedRegistrationData);
     }

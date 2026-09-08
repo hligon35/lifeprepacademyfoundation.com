@@ -1,0 +1,136 @@
+{
+  "name": "MLS GO - Missing Agreement Documents",
+  "flow": [
+    {
+      "id": 1,
+      "module": "google-sheets:filterRows",
+      "version": 2,
+      "parameters": { "__IMTCONN__": 10945462 },
+      "mapper": {
+        "from": "drive",
+        "spreadsheetId": "1EIG6F00-mVhT9ws0nS3pJBrp9Y2mPH87p6UyLkWtKT4",
+        "sheetId": "Players",
+        "includesHeaders": true,
+        "tableFirstRow": "A1:EZ1",
+        "filter": [
+          [
+            { "a": "C", "o": "exist" },
+            { "a": "G", "o": "exist" },
+            { "a": "CK", "o": "notexist" }
+          ],
+          [
+            { "a": "C", "o": "exist" },
+            { "a": "G", "o": "exist" },
+            { "a": "EG", "o": "notexist" }
+          ]
+        ],
+        "orderBy": "__ROW_NUMBER__",
+        "sortOrder": "asc",
+        "valueRenderOption": "FORMATTED_VALUE",
+        "dateTimeRenderOption": "FORMATTED_STRING",
+        "fieldType": "string",
+        "limit": 500
+      },
+      "metadata": {
+        "designer": { "x": 0, "y": 0 },
+        "restore": {
+          "expect": {
+            "spreadsheetId": { "label": "Paducah MLS GO Soccer Registration" },
+            "sheetId": { "label": "Players" }
+          }
+        }
+      }
+    },
+    {
+      "id": 2,
+      "module": "http:ActionSendData",
+      "version": 3,
+      "parameters": {
+        "handleErrors": true,
+        "useNewZLibDeCompress": true
+      },
+      "mapper": {
+        "url": "https://script.google.com/macros/s/AKfycby2-9Q062MruTN9fiemWUatxlmTKfk5OzYbAWrUD41rLkJGGODOJBrkR_6xbwi8xS64/exec",
+        "serializeUrl": false,
+        "method": "post",
+        "headers": [
+          { "name": "Content-Type", "value": "application/json" }
+        ],
+        "qs": [],
+        "bodyType": "raw",
+        "parseResponse": true,
+        "authUser": "",
+        "authPass": "",
+        "timeout": "40",
+        "shareCookies": false,
+        "ca": "",
+        "rejectUnauthorized": true,
+        "followRedirect": true,
+        "useQuerystring": false,
+        "gzip": true,
+        "useMtls": false,
+        "contentType": "",
+        "data": "{\"action\":\"create_agreement_resume_link\",\"sharedSecret\":\"REPLACE_WITH_CONTINUE_WORKER_SHARED_SECRET\",\"registrationId\":\"{{1.`2`}}\",\"email\":\"{{lower(trim(1.`6`))}}\"}",
+        "followAllRedirects": true
+      },
+      "metadata": {
+        "designer": { "x": 350, "y": 0 },
+        "interface": [
+          { "name": "statusCode", "label": "Status code", "type": "number" },
+          { "name": "headers", "label": "Headers", "type": "collection" },
+          {
+            "name": "data",
+            "label": "Data",
+            "type": "collection",
+            "spec": [
+              { "name": "ok", "label": "ok", "type": "boolean" },
+              { "name": "row", "label": "row", "type": "number" },
+              { "name": "agreementUrl", "label": "agreementUrl", "type": "text" },
+              { "name": "parentName", "label": "parentName", "type": "text" },
+              { "name": "participantNames", "label": "participantNames", "type": "text" },
+              { "name": "error", "label": "error", "type": "text" }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 3,
+      "module": "google-email:sendAnEmail",
+      "version": 4,
+      "parameters": { "__IMTCONN__": 10945640 },
+      "filter": {
+        "name": "Agreement link created",
+        "conditions": [[
+          { "a": "{{2.data.ok}}", "b": "true", "o": "boolean:equal" },
+          { "a": "{{2.data.agreementUrl}}", "o": "exist" }
+        ]]
+      },
+      "mapper": {
+        "to": ["{{lower(trim(1.`6`))}}"],
+        "subject": "Action needed: sign your Paducah GO Soccer agreements",
+        "bodyType": "rawHtml",
+        "from": "\"Youth Department\" <youthprograms@lifeprepacademyfoundation.com>",
+        "content": "<!DOCTYPE html><html><head><meta charset=\"UTF-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1.0\"><title>Complete Your Registration Agreements</title></head><body style=\"margin:0;padding:0;background:#f1f4f3;font-family:Arial,Helvetica,sans-serif;color:#222\"><table role=\"presentation\" width=\"100%\" cellspacing=\"0\" cellpadding=\"0\" border=\"0\"><tr><td align=\"center\" style=\"padding:24px 12px\"><table role=\"presentation\" width=\"600\" cellspacing=\"0\" cellpadding=\"0\" border=\"0\" style=\"width:100%;max-width:600px;background:#fff;border-radius:8px;overflow:hidden\"><tr><td style=\"padding:0;line-height:0\"><img src=\"https://mlsregistration.lifeprepacademyfoundation.com/LPAFxPGS.PNG\" alt=\"LifePrep Academy Foundation - Paducah GO Soccer\" width=\"600\" style=\"display:block;width:100%;height:auto;border:0\"></td></tr><tr><td style=\"padding:32px 34px 40px\"><h1 style=\"margin:0 0 20px;font-size:27px;line-height:1.25;color:#20477d\">Complete your registration agreements</h1><p style=\"margin:0 0 16px;font-size:14px;line-height:1.6\">Hello {{ifempty(2.data.parentName; 1.`4`)}},</p><p style=\"margin:0 0 16px;font-size:14px;line-height:1.6\">Your Paducah GO Soccer registration is saved, but one or more required agreement files are missing.</p><p style=\"margin:0 0 20px;font-size:14px;line-height:1.6\"><strong>Participant(s):</strong> {{2.data.participantNames}}</p><p style=\"margin:24px 0\"><a href=\"{{2.data.agreementUrl}}\" target=\"_blank\" style=\"display:inline-block;padding:15px 28px;font-size:14px;font-weight:700;color:#fff;text-decoration:none;background:#08653f;border-radius:7px\">Review and Sign Agreements</a></p><p style=\"margin:0 0 16px;font-size:13px;line-height:1.6;color:#596760\">This secure link expires in 14 days. Review the agreements, check the consent boxes, and submit. The signed document links will be recorded on your existing registration.</p><p style=\"margin:24px 0 0;font-size:14px;line-height:1.6\">Thank you,<br><strong>Paducah GO Soccer</strong><br>LifePrep Academy Foundation</p></td></tr></table></td></tr></table></body></html>"
+      },
+      "metadata": { "designer": { "x": 700, "y": 0 } }
+    }
+  ],
+  "metadata": {
+    "instant": false,
+    "version": 1,
+    "scenario": {
+      "roundtrips": 1,
+      "maxErrors": 3,
+      "autoCommit": true,
+      "autoCommitTriggerLast": true,
+      "sequential": true,
+      "confidential": true,
+      "dataloss": false,
+      "dlq": false,
+      "freshVariables": false
+    },
+    "designer": { "orphans": [] },
+    "zone": "us2.make.com"
+  }
+}

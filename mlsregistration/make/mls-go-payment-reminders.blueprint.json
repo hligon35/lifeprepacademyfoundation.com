@@ -1,0 +1,113 @@
+{
+  "name": "MLS GO - Payment Only Reminders",
+  "flow": [
+    {
+      "id": 1,
+      "module": "google-sheets:filterRows",
+      "version": 2,
+      "parameters": {
+        "__IMTCONN__": 10945462
+      },
+      "mapper": {
+        "from": "drive",
+        "valueRenderOption": "FORMATTED_VALUE",
+        "dateTimeRenderOption": "FORMATTED_STRING",
+        "limit": 1,
+        "spreadsheetId": "1EIG6F00-mVhT9ws0nS3pJBrp9Y2mPH87p6UyLkWtKT4",
+        "sheetId": "Players",
+        "includesHeaders": true,
+        "tableFirstRow": "A1:EZ1",
+        "filter": [[
+          { "a": "C", "o": "exist" },
+          { "a": "G", "o": "exist" },
+          { "a": "CA", "o": "text:notequal:ci", "b": "Yes" },
+          { "a": "CA", "o": "text:notequal:ci", "b": "True" },
+          { "a": "CN", "o": "text:notequal:ci", "b": "Paid" },
+          { "a": "CN", "o": "text:notequal:ci", "b": "Pending Scholarship" },
+          { "a": "CR", "o": "notexist" },
+          { "a": "CS", "o": "notexist" },
+          { "a": "CK", "o": "exist" },
+          { "a": "EG", "o": "exist" },
+          { "a": "CT", "o": "notexist" }
+        ]],
+        "orderBy": "__ROW_NUMBER__",
+        "sortOrder": "asc",
+        "fieldType": "string"
+      },
+      "metadata": {
+        "designer": { "x": 0, "y": 0 },
+        "restore": {
+          "expect": {
+            "spreadsheetId": { "label": "Paducah MLS GO Soccer Registration" },
+            "sheetId": { "label": "Players" }
+          }
+        }
+      }
+    },
+    {
+      "id": 2,
+      "module": "google-email:sendAnEmail",
+      "version": 4,
+      "parameters": {
+        "__IMTCONN__": 10945640
+      },
+      "mapper": {
+        "to": ["{{lower(trim(1.`6`))}}"],
+        "subject": "ACTION NEEDED! Please complete your child's registration by submitting payment.",
+        "bodyType": "rawHtml",
+        "from": "\"Youth Department\" <youthprograms@lifeprepacademyfoundation.com>",
+        "content": "<!DOCTYPE html><html><head><meta charset=\"UTF-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1.0\"><title>Complete Your Registration Payment</title></head><body style=\"margin:0;padding:0;background:#f1f4f3;font-family:Arial,Helvetica,sans-serif;color:#222\"><table role=\"presentation\" width=\"100%\" cellspacing=\"0\" cellpadding=\"0\" border=\"0\"><tr><td align=\"center\" style=\"padding:24px 12px\"><table role=\"presentation\" width=\"600\" cellspacing=\"0\" cellpadding=\"0\" border=\"0\" style=\"width:100%;max-width:600px;background:#fff;border-radius:14px;overflow:hidden\"><tr><td style=\"padding:0;line-height:0\"><img src=\"https://mlsregistration.lifeprepacademyfoundation.com/LPAFxPGS.PNG\" alt=\"LifePrep Academy Foundation - Paducah GO Soccer\" width=\"600\" style=\"display:block;width:100%;height:auto;border:0\"></td></tr><tr><td style=\"padding:32px 34px 40px\"><h1 style=\"margin:0 0 20px;font-size:27px;line-height:1.25;color:#20477d\">Friendly Payment Reminder</h1><p style=\"margin:0 0 16px;font-size:14px;line-height:1.6\">Hello {{1.`4`}} {{1.`5`}},</p><p style=\"margin:0 0 16px;font-size:14px;line-height:1.6\">Thank you for registering your player(s) for Paducah GO Soccer.</p><p style=\"margin:0 0 16px;font-size:14px;line-height:1.6\">Your agreements are complete, but our records show that payment is still outstanding. If you recently paid, please disregard this message.</p><p style=\"margin:0 0 20px;font-size:14px;line-height:1.6\">Use the secure button below to complete payment.</p><table role=\"presentation\" cellspacing=\"0\" cellpadding=\"0\" border=\"0\" style=\"margin:0 0 20px\"><tr><td bgcolor=\"#08653f\" style=\"border-radius:7px\"><a href=\"https://quest.build/get-tickets/1598/71794/info?teamId=686&amp;quantity={{1.`25`}}\" target=\"_blank\" style=\"display:inline-block;padding:15px 28px;font-size:14px;font-weight:700;color:#fff;text-decoration:none;background:#08653f;border-radius:7px\">Complete Payment</a></td></tr></table><p style=\"margin:0 0 16px;font-size:14px;line-height:1.6\">If you have questions about your balance or need assistance, please contact us.</p><p style=\"margin:0;font-size:14px;line-height:1.6\">Thank you,<br><strong>Paducah GO Soccer</strong><br>LifePrep Academy Foundation</p></td></tr></table></td></tr></table></body></html>"
+      },
+      "metadata": {
+        "designer": { "x": 350, "y": 0 }
+      }
+    },
+    {
+      "id": 3,
+      "module": "google-sheets:updateRow",
+      "version": 2,
+      "parameters": {
+        "__IMTCONN__": 10945462
+      },
+      "mapper": {
+        "mode": "select",
+        "valueInputOption": "USER_ENTERED",
+        "from": "drive",
+        "spreadsheetId": "/1EIG6F00-mVhT9ws0nS3pJBrp9Y2mPH87p6UyLkWtKT4",
+        "sheetId": "Players",
+        "rowNumber": "{{1.__ROW_NUMBER__}}",
+        "includesHeaders": true,
+        "useColumnHeaders": false,
+        "values": {
+          "97": "{{formatDate(now; \"YYYY-MM-DDTHH:mm:ss.SSS[Z]\"; \"UTC\")}}",
+          "98": "{{ifempty(1.`98`; 0) + 1}}"
+        }
+      },
+      "metadata": {
+        "designer": { "x": 700, "y": 0 },
+        "restore": {
+          "expect": {
+            "sheetId": { "label": "Players" }
+          }
+        }
+      }
+    }
+  ],
+  "metadata": {
+    "instant": false,
+    "version": 1,
+    "scenario": {
+      "roundtrips": 1,
+      "maxErrors": 3,
+      "autoCommit": true,
+      "autoCommitTriggerLast": true,
+      "sequential": true,
+      "confidential": true,
+      "dataloss": false,
+      "dlq": false,
+      "freshVariables": false
+    },
+    "designer": { "orphans": [] },
+    "zone": "us2.make.com"
+  }
+}

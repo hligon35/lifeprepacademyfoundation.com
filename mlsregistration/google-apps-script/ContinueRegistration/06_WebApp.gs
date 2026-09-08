@@ -218,6 +218,7 @@ function handleApiPost_(e) {
   }
 
   const action = normalize_(request.action);
+  if (action === 'create_agreement_resume_link') return apiCreateAgreementResumeLink_(request);
   if (action === 'resume_context') return apiResumeContext_(request);
   if (action === 'resume_complete') return apiResumeComplete_(request);
   if (action === 'resume_withdraw_verify') return apiResumeWithdrawVerify_(request);
@@ -225,8 +226,40 @@ function handleApiPost_(e) {
   return jsonOutput_({ ok: false, error: 'Unknown action.' });
 }
 
+function apiCreateAgreementResumeLink_(request) {
+  const registrationId = normalize_(request.registrationId);
+  const player = findPlayerByRegistrationId_(registrationId);
+  if (!player) return jsonOutput_({ ok: false, error: 'The Players row could not be found.' });
+
+  const requestedEmail = normalizeEmail_(request.email);
+  const playerEmail = normalizeEmail_(player.parent_email);
+  if (!requestedEmail || requestedEmail !== playerEmail) {
+    return jsonOutput_({ ok: false, error: 'The email does not match the Players row.' });
+  }
+
+  const children = getPlayerChildren_(player);
+  if (!children.length) return jsonOutput_({ ok: false, error: 'No participants were found on the Players row.' });
+
+  try {
+    const caseRecord = findOrCreateCaseForPlayerRow_(player._row);
+    const token = createAgreementToken_(caseRecord, player);
+    return jsonOutput_({
+      ok: true,
+      row: player._row,
+      agreementUrl: CONTINUE_CONFIG.REGISTRATION_URL + '?resume=' + encodeURIComponent(token) + '&section=agreements',
+      parentName: normalize_(player.parent_first_name + ' ' + player.parent_last_name),
+      participantNames: children.map(function(child) { return child.displayName; }).join(', '),
+    });
+  } catch (error) {
+    return jsonOutput_({ ok: false, error: errorMessage_(error) });
+  }
+}
+
 function apiResumeContext_(request) {
-  const token = verifyToken_(request.resumeToken, 'resume');
+  const token = verifyToken_(request.resumeToken);
+  if (token.typ !== 'resume' && token.typ !== 'agreement') {
+    return jsonOutput_({ ok: false, error: 'This secure link is not valid for registration restoration.' });
+  }
   const caseRecord = findCaseById_(token.caseId);
   if (!caseRecord) return jsonOutput_({ ok: false, error: 'Continuation case not found.' });
 
@@ -238,12 +271,14 @@ function apiResumeContext_(request) {
     return jsonOutput_({ ok: false, code: 'ALREADY_WITHDRAWN', error: 'This registration has been withdrawn. No further action is required.' });
   }
 
-  if (caseIsCompleted_(caseRecord) && normalize_(caseRecord.completion_owner_token_id) !== normalize_(token.tokenId)) {
+  if (token.typ === 'resume' && caseIsCompleted_(caseRecord) && normalize_(caseRecord.completion_owner_token_id) !== normalize_(token.tokenId)) {
     return jsonOutput_(alreadyCompletedResponse_());
   }
 
   try {
-    return jsonOutput_({ ok: true, context: buildMergedRegistrationSnapshot_(caseRecord, token) });
+    const context = buildMergedRegistrationSnapshot_(caseRecord, token);
+    context.resume.agreementOnly = token.typ === 'agreement';
+    return jsonOutput_({ ok: true, context: context });
   } catch (error) {
     return jsonOutput_({ ok: false, error: errorMessage_(error) });
   }

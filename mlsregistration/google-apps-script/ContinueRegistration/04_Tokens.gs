@@ -41,6 +41,24 @@ function createResumeToken_(caseRecord, claim, primaryContact, testMode) {
   }, CONTINUE_CONFIG.RESUME_TOKEN_MINUTES * 60000);
 }
 
+function createAgreementToken_(caseRecord, playerRecord) {
+  return signToken_({
+    typ: 'agreement',
+    caseId: normalize_(caseRecord.case_id),
+    caseVersion: Number(caseRecord.case_version) || 1,
+    canonicalRegistrationId: normalize_(playerRecord.registration_submission_id),
+    claimedChildKeys: getPlayerChildren_(playerRecord).map(function(child) { return child.nameKey; }),
+    releasedChildKeys: [],
+    duplicateChildKeys: [],
+    uncertainChildKeys: [],
+    primaryEmail: normalizeEmail_(playerRecord.parent_email),
+    primaryName: normalize_(playerRecord.parent_first_name + ' ' + playerRecord.parent_last_name),
+    tokenId: Utilities.getUuid(),
+    agreementOnly: true,
+    test: false,
+  }, CONTINUE_CONFIG.TOKEN_DAYS * 86400000);
+}
+
 function signToken_(claims, ttlMs) {
   const now = Date.now();
   const payload = Object.assign({}, claims, {
