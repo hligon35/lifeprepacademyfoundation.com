@@ -1,4 +1,7 @@
 (function () {
+  const requestedFlow = new URLSearchParams(window.location.search).get("flow");
+  if (requestedFlow !== "volunteer" && requestedFlow !== "coach") return;
+
   const FORM_ACTION =
     "https://docs.google.com/forms/d/e/1FAIpQLScCUTOgeNb7shvYUrpjbNKn5kh_K_U3tEwks8aJ4zvbXFKWLw/formResponse";
   const FBZX = "-3891024944817654155";

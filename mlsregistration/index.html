@@ -19,9 +19,28 @@
     />
     <link rel="stylesheet" href="./styles.css?v=2026-08-25-1" />
     <link rel="stylesheet" href="./validation-ux.css?v=2026-08-31-2" />
+    <script>
+      const registrationFlow = new URLSearchParams(window.location.search).get("flow");
+      if (registrationFlow !== "volunteer" && registrationFlow !== "coach") {
+        document.documentElement.classList.add("registration-is-closed");
+      }
+    </script>
   </head>
   <body>
     <main class="page-shell">
+      <section class="registration-closed-notice" role="dialog" aria-modal="true" aria-labelledby="registration-closed-title">
+        <img
+          src="./LPAFxPGS.PNG"
+          alt="LifePrep Academy Foundation and Paducah GO Soccer"
+          class="registration-closed-notice__image"
+        />
+        <div class="registration-closed-notice__content">
+          <p class="eyebrow">LifePrep Academy Foundation MLS GO</p>
+          <h1 id="registration-closed-title">Registration is closed</h1>
+          <p>MLS GO registration is closed until next season. Please check back for future registration dates.</p>
+          <a class="btn btn-primary" href="https://lifeprepacademyfoundation.com/mls-go.html">Return to MLS GO</a>
+        </div>
+      </section>
       <section class="card" aria-live="polite">
         <header class="hero">
           <img
