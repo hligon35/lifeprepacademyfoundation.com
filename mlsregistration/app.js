@@ -3061,45 +3061,8 @@
     return "";
   }
 
-  function sanitizePaymentParam(value) {
-    return String(value || "").trim();
-  }
-
-  function appendPaymentParamVariants(url, keys, value) {
-    const normalized = sanitizePaymentParam(value);
-    if (!normalized) return;
-    keys.forEach((key) => {
-      url.searchParams.set(key, normalized);
-    });
-  }
-
-  function buildPaymentRedirectUrl(registrationData) {
-    const baseUrl = sanitizePaymentParam(PAYMENT_REDIRECT_URL);
-    if (!baseUrl) return "";
-
-    try {
-      const url = new URL(baseUrl);
-      const parent = registrationData?.parent || {};
-      const firstName = sanitizePaymentParam(parent.firstName);
-      const lastName = sanitizePaymentParam(parent.lastName);
-      const email = sanitizePaymentParam(parent.email);
-      const zip = sanitizePaymentParam(parent.zip);
-      const submissionId = sanitizePaymentParam(registrationData?.registrationSubmissionId);
-      const paymentAmount = String(calculateRegistrationFeeAmount());
-
-      appendPaymentParamVariants(url, ["firstName", "firstname", "first_name", "givenName", "given_name"], firstName);
-      appendPaymentParamVariants(url, ["lastName", "lastname", "last_name", "familyName", "family_name"], lastName);
-      appendPaymentParamVariants(url, ["fullName", "full_name", "name"], [firstName, lastName].filter(Boolean).join(" "));
-      appendPaymentParamVariants(url, ["email", "emailAddress", "email_address", "customerEmail", "customer_email"], email);
-      appendPaymentParamVariants(url, ["zip", "zipCode", "zipcode", "postalCode", "postal_code", "postal"], zip);
-      appendPaymentParamVariants(url, ["registration_submission_id", "submission_id", "submissionId", "registrationId", "reference", "external_reference"], submissionId);
-      appendPaymentParamVariants(url, ["payment_amount", "amount", "total"], paymentAmount);
-      appendPaymentParamVariants(url, ["payment_currency", "currency"], "USD");
-
-      return url.toString();
-    } catch (_error) {
-      return baseUrl;
-    }
+  function buildPaymentRedirectUrl() {
+    return PAYMENT_REDIRECT_URL;
   }
 
   function collectRegistrationData() {
