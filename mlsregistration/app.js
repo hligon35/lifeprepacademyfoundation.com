@@ -73,6 +73,7 @@
   const ENABLE_GOOGLE_FORM_MIRROR = false;
   const FORM_UPSERT_TIMEOUT_MS = 30000;
   const FINAL_CONFIRMATION_TIMEOUT_MS = 30000;
+  const REGISTRATION_SUBMISSION_STORAGE_KEY = "mls-go-registration-submission-id:v1";
 
   const FLOW = {
     PLAYER: "player",
@@ -390,7 +391,7 @@
   let volunteerAgreementSigned = false;
   let coachingAgreementSigned = false;
   let finalConfirmationEmailFailed = false;
-  let registrationSubmissionId = "";
+  let registrationSubmissionId = readPersistedRegistrationSubmissionId();
   let volunteerSubmissionId = "";
   let coachingSubmissionId = "";
   let playerAgreementTransactionId = "";
@@ -2675,6 +2676,7 @@
 
     const registrationData = collectRegistrationData();
     registrationSubmissionId = registrationSubmissionId || generateSubmissionId("reg");
+    persistRegistrationSubmissionId(registrationSubmissionId);
     registrationData.registrationSubmissionId = registrationSubmissionId;
     const params = new URLSearchParams();
 
@@ -2875,6 +2877,7 @@
     }
 
     setSubmissionStatus(STAGES.FINAL_CONFIRMATION_EMAIL, "idle", false);
+    clearPersistedRegistrationSubmissionId();
     advanceToStage(STAGES.THANK_YOU);
   }
 
@@ -3483,6 +3486,30 @@
     const sheetUpdateError = String(payload?.sheetUpdate?.error || "").trim();
     const primaryError = String(payload?.error || "").trim();
     return sheetUpdateError || primaryError || fallbackMessage;
+  }
+
+  function readPersistedRegistrationSubmissionId() {
+    try {
+      return String(window.sessionStorage.getItem(REGISTRATION_SUBMISSION_STORAGE_KEY) || "").trim();
+    } catch (_error) {
+      return "";
+    }
+  }
+
+  function persistRegistrationSubmissionId(submissionId) {
+    try {
+      window.sessionStorage.setItem(REGISTRATION_SUBMISSION_STORAGE_KEY, String(submissionId || "").trim());
+    } catch (_error) {
+      // Registration still works when browser storage is unavailable.
+    }
+  }
+
+  function clearPersistedRegistrationSubmissionId() {
+    try {
+      window.sessionStorage.removeItem(REGISTRATION_SUBMISSION_STORAGE_KEY);
+    } catch (_error) {
+      // Nothing else is required when browser storage is unavailable.
+    }
   }
 
   function generateSubmissionId(prefix) {
