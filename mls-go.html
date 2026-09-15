@@ -303,8 +303,8 @@
               <p class="muted program-subpage-lead">
                 MLS GO is a fun, community-centered soccer experience designed
                 to help young athletes build confidence, learn the game, and
-                enjoy a season of structured team play. <strong>Registration is closed
-                until next season.</strong>
+                enjoy a season of structured team play.
+                <strong>Registration is closed until next season.</strong>
               </p>
               <figure class="program-hero-media">
                 <img
@@ -317,12 +317,24 @@
                 />
               </figure>
               <div class="program-subpage-actions">
-                <a href="https://mlsregistration.lifeprepacademyfoundation.com/" class="btn btn-primary" id="mls-registration-link" aria-haspopup="dialog">
-                  Register for MLS GO </a>
-                <a href="https://mlsregistration.lifeprepacademyfoundation.com/?flow=volunteer" class="btn btn-outline">
-                  Volunteer Form </a>
-                <a href="https://mlsregistration.lifeprepacademyfoundation.com/?flow=coach" class="btn btn-outline">
-                  Coaching Application</a>
+                <a
+                  href="https://mlsregistration.lifeprepacademyfoundation.com/"
+                  class="btn btn-primary"
+                  id="mls-registration-link"
+                  aria-haspopup="dialog"
+                >
+                  Register for MLS GO </a
+                ><a
+                  href="https://mlsregistration.lifeprepacademyfoundation.com/?flow=volunteer"
+                  class="btn btn-outline"
+                >
+                  Volunteer Form </a
+                ><a
+                  href="https://mlsregistration.lifeprepacademyfoundation.com/?flow=coach"
+                  class="btn btn-outline"
+                >
+                  Coaching Application</a
+                >
               </div>
               <div class="program-intro-block" aria-label="Program overview">
                 <p>
@@ -444,25 +456,42 @@
         </div>
       </footer>
     </div>
-    <dialog class="registration-closed-dialog" id="registration-closed-dialog" aria-labelledby="registration-closed-title">
+    <dialog
+      class="registration-closed-dialog"
+      id="registration-closed-dialog"
+      aria-labelledby="registration-closed-title"
+    >
       <div class="registration-closed-dialog__content">
         <h2 id="registration-closed-title">Registration is closed</h2>
-        <p>MLS GO registration is closed until next season. Please check back for future registration dates.</p>
-        <button class="btn btn-primary" id="registration-closed-dismiss" type="button">Close</button>
+        <p>
+          MLS GO registration is closed until next season. Please check back for
+          future registration dates.
+        </p>
+        <button
+          class="btn btn-primary"
+          id="registration-closed-dismiss"
+          type="button"
+        >
+          Close
+        </button>
       </div>
     </dialog>
     <script src="script.min.js?v=18345b2211" defer></script>
     <script>
       const registrationLink = document.getElementById("mls-registration-link");
-      const registrationDialog = document.getElementById("registration-closed-dialog");
-      const registrationDialogDismiss = document.getElementById("registration-closed-dismiss");
-
+      const registrationDialog = document.getElementById(
+        "registration-closed-dialog",
+      );
+      const registrationDialogDismiss = document.getElementById(
+        "registration-closed-dismiss",
+      );
       registrationLink.addEventListener("click", (event) => {
         event.preventDefault();
         registrationDialog.showModal();
       });
-
-      registrationDialogDismiss.addEventListener("click", () => registrationDialog.close());
+      registrationDialogDismiss.addEventListener("click", () =>
+        registrationDialog.close(),
+      );
     </script>
   </body>
 </html>
