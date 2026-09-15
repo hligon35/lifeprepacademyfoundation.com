@@ -478,6 +478,11 @@
     </dialog>
     <script src="script.min.js?v=18345b2211" defer></script>
     <script>
+      // Master on/off switch for player registration. Flip to true and deploy to
+      // reopen. Keep in sync with the REGISTRATION_OPEN flag in
+      // mlsregistration/flow-gate.js.
+      const REGISTRATION_OPEN = false;
+
       const registrationLink = document.getElementById("mls-registration-link");
       const registrationDialog = document.getElementById(
         "registration-closed-dialog",
@@ -485,10 +490,14 @@
       const registrationDialogDismiss = document.getElementById(
         "registration-closed-dismiss",
       );
-      registrationLink.addEventListener("click", (event) => {
-        event.preventDefault();
-        registrationDialog.showModal();
-      });
+
+      if (!REGISTRATION_OPEN) {
+        registrationLink.addEventListener("click", (event) => {
+          event.preventDefault();
+          registrationDialog.showModal();
+        });
+      }
+
       registrationDialogDismiss.addEventListener("click", () =>
         registrationDialog.close(),
       );
