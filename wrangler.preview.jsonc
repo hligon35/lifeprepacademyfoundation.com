@@ -38,6 +38,25 @@
       "binding": "SIGNED_AGREEMENTS",
       "bucket_name": "lpaf-mls-signed-agreements-preview",
       "remote": true
+    },
+    {
+      "binding": "SITE_STATIC",
+      "bucket_name": "site-static-preview",
+      "remote": true
+    },
+    {
+      "binding": "SITE_ADMIN",
+      "bucket_name": "site-admin-preview",
+      "remote": true
+    }
+  ],
+
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "lpaf-db-preview",
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "mlsregistration/worker/migrations"
     }
   ],
 
