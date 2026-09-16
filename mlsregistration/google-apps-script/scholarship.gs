@@ -10,7 +10,7 @@ const SCHOLARSHIP_CONFIG = Object.freeze({
   TIME_ZONE: 'America/Indianapolis',
   DOCUMENT_VERSION: '1.0',
   TOKEN_VALID_DAYS: 60,
-  WEB_APP_URL: 'https://script.google.com/macros/s/AKfycbxe5ObXXsACvVrIw5oYEGO0kf1Nc7-8OyjnmQQd7Y3A0pkHX70c2IK90HWboJkp-2EE/exec',
+  WEB_APP_URL: 'https://script.google.com/macros/s/AKfycbx1B_NuTAUDW86CFr0WQE8tYIZE1aVEGUcPzkvng0CBUSBxpmUJ_JKlKyRaLW_sK439dA/exec',
   WEBHOOK_ACTION: 'send_new_scholarship_terms',
   LINK_ACTION: 'create_scholarship_acceptance_link',
   LIVE_ARCHIVE_ACTION: 'archive_live_scholarship_application',

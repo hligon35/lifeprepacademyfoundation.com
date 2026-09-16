@@ -63,9 +63,13 @@
   "vars": {
     "PLAYER_SIGNATURE_PLACEMENT_MODE": "parent_guardian_only",
 
-    "ALLOWED_ORIGINS": "https://mlsregistration-preview.hligon.workers.dev,http://127.0.0.1:3000,http://localhost:3000",
+    "ALLOWED_ORIGINS": "https://mlsregistration-preview.bhall-554.workers.dev,http://127.0.0.1:3000,http://localhost:3000",
 
-    "E_CONSENT_TEXT_VERSION": "v1-2026-08-06"
+    "E_CONSENT_TEXT_VERSION": "v1-2026-08-06",
+
+    "APPS_SCRIPT_URL": "https://script.google.com/macros/s/AKfycbwFGPZH8uWVuroO83DbJiyEjohYKaGUfoyMmpiiBTZtkiuF2IOH8L88Jn_iFucCw_Ll9Q/exec",
+
+    "CONTINUATION_WEB_APP_URL": "https://script.google.com/macros/s/AKfycbxyJDjIgXpfFllY6KsfRSvp797m1nMJwsAM69FpH-tP1IVoGiDOSh-SS43YSE02F0Ro/exec"
   },
 
   "observability": {

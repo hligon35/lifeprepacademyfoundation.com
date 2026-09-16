@@ -553,25 +553,32 @@ function handleScholarshipAcceptance_(values) {
   }
 
   /*
-   * Prefer the permanent Drive URL returned by the scholarship app.
-   * If its response uses another supported alias, the metadata helper
-   * normalizes it before the sheet is reread.
+   * Prefer the permanent Drive URL returned directly by the automation
+   * response. Fall back to rereading the sheet (with a short retry, since
+   * the standalone scholarship app's write to J:Z may lag slightly behind
+   * this response) in case the URL is only supported via the sheet column.
    */
-  const refreshedHeaders = getScholarshipSheetHeadersAZ_(sheet);
-
-  const refreshedRecord =
-    readSheetRowRecordByHeader_(
-      sheet,
-      refreshedHeaders,
-      row
-    );
-
   documentUrl = normalizeValue_(
-    getRecordValueByHeader_(
-      refreshedRecord,
-      'scholarship_terms_pdf_url'
-    )
+    automationResult.documentUrl ||
+    automationResult.pdfUrl ||
+    automationResult.url ||
+    automationResult.driveUrl ||
+    automationResult.scholarship_terms_pdf_url
   );
+
+  let refreshedRecord = record;
+
+  if (!documentUrl) {
+    for (let attempt = 0; attempt < 3 && !documentUrl; attempt += 1) {
+      if (attempt > 0) Utilities.sleep(1000);
+
+      const refreshedHeaders = getScholarshipSheetHeadersAZ_(sheet);
+      refreshedRecord = readSheetRowRecordByHeader_(sheet, refreshedHeaders, row);
+      documentUrl = normalizeValue_(
+        getRecordValueByHeader_(refreshedRecord, 'scholarship_terms_pdf_url')
+      );
+    }
+  }
 
   if (!documentUrl) {
     return json_({

@@ -1,0 +1,16 @@
+HTTP/1.1 302 Found
+Content-Type: application/binary
+Access-Control-Allow-Origin: *
+Cache-Control: no-cache, no-store, max-age=0, must-revalidate
+Pragma: no-cache
+Expires: Mon, 01 Jan 1990 00:00:00 GMT
+Date: Wed, 16 Sep 2026 17:56:10 GMT
+Location: https://script.googleusercontent.com/macros/echo?user_content_key=AUkAhnSPGYxH7x6PYfVC7lnAHgvAypWWYNIlrArB7PVD2BfXQFji6e5dmaMPyQNiwOeazdsvWCxUJ3Si7jbCzn0pIZxGpbw216AA59jn9leyA0dX3V7kkRYcowV7B_4GWaau6oGvk2qayYFT1Zj1WeWykSdyT8eM_4hEGbeR9TsGTSsqWH_XKxzXRpZiYq0M204d3EXnai_-O9Xke0ux_-OguDMI-vBVwF8ZFjIktSgPQN4Sdrwb4WAcga7kHv1hc3t_VAagMazf6XQQ8lsxWn2CXRhnSMqwiQ&lib=Mz9pc03wjE9INERxg1DofTcQ84rMa-1c5
+X-Frame-Options: SAMEORIGIN
+Content-Security-Policy: frame-ancestors 'self'
+Server: ESF
+Content-Length: 0
+X-XSS-Protection: 0
+X-Content-Type-Options: nosniff
+Alt-Svc: h3=":443"; ma=2592000,h3-29=":443"; ma=2592000
+

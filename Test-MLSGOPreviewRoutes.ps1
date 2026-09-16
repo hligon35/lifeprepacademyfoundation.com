@@ -15,7 +15,7 @@ param(
 
     [string]$Email = "hligon@getsparqd.com",
 
-    [string]$BaseUrl = "https://mlsregistration-preview.hligon.workers.dev"
+    [string]$BaseUrl = "https://mlsregistration-preview.bhall-554.workers.dev"
 )
 
 $ErrorActionPreference = "Stop"

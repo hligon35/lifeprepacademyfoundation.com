@@ -1843,18 +1843,41 @@ function timingSafeEq(a, b) {
   return out === 0;
 }
 
-async function postAppsScriptForm(url, params) {
-  const body = typeof params === "string" ? params : params.toString();
-  const res = await fetch(url, {
-    method: "POST",
-    body,
-    redirect: "follow",
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
-    },
-  });
+// Google's exec URL 302s to script.googleusercontent.com; auto-follow (redirect:"follow")
+// Apps Script's exec URL 302s to a single-use script.googleusercontent.com "echo" URL that
+// only accepts GET. Letting fetch auto-follow can double-hit that single-use URL, so follow
+// it manually with exactly one GET.
+async function fetchAppsScriptExec(url, init) {
+  const res = await fetch(url, { ...init, redirect: "manual" });
+  if (res.status >= 300 && res.status < 400) {
+    const location = res.headers.get("location");
+    if (location) return fetch(new URL(location, url).toString(), { method: "GET" });
+  }
+  return res;
+}
 
-  return res.text();
+async function postAppsScriptForm(url, params, maxAttempts = 3) {
+  const body = typeof params === "string" ? params : params.toString();
+  let lastText = "";
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    const res = await fetchAppsScriptExec(url, {
+      method: "POST",
+      body,
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
+      },
+    });
+    lastText = await res.text();
+
+    // Google throttling/quota interstitials come back as HTML, not our JSON. Retry with backoff.
+    const looksLikeJson = lastText.trim().startsWith("{");
+    if (looksLikeJson || attempt === maxAttempts) return lastText;
+
+    await new Promise((resolve) => setTimeout(resolve, 400 * attempt));
+  }
+
+  return lastText;
 }
 
 function hasAppsScriptUpdateToken(env) {
