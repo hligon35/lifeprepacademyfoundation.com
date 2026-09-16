@@ -1,0 +1,9 @@
+# Copy to .dev.vars for local Wrangler development. Never commit .dev.vars.
+APPS_SCRIPT_UPDATE_TOKEN=replace-with-local-token
+AGREEMENT_UPDATE_TOKEN=replace-with-local-token
+CONTINUATION_WORKER_SHARED_SECRET=replace-with-local-secret
+SIGNER_LINK_SECRET=replace-with-a-long-random-secret
+ADMIN_DOWNLOAD_TOKEN=replace-with-local-token
+PAYMENT_WEBHOOK_TOKEN=replace-with-local-token
+NEWSLETTER_PROVIDER_API_KEY=replace-with-local-provider-key
+NEWSLETTER_WEBHOOK_SECRET=replace-with-local-webhook-secret
