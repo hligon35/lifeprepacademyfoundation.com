@@ -60,16 +60,8 @@
 		{
 			"binding": "DB",
 			"database_name": "lpaf-db",
-			// Placeholder until `wrangler d1 create lpaf-db` is run and authorized for remote use.
-			// Local development/testing works without a real database_id via `--local`.
-			"database_id": "00000000-0000-0000-0000-000000000000",
-			"migrations_dir": "mlsregistration/worker/migrations"
-		},
-		{
-			"binding": "lpaf_db",
-			"database_name": "lpaf-db",
 			"database_id": "5dcfaef5-575e-4fd4-b8d3-9fd1ab142b8e",
-			"remote": true
+			"migrations_dir": "mlsregistration/worker/migrations"
 		}
 	],
 	"vars": {
