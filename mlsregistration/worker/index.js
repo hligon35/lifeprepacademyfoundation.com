@@ -9,6 +9,17 @@ import {
 } from "./pdf-field-maps.js";
 import { buildPaymentConfig } from "./payment-config.js";
 import { parseQuestReceiptEmail } from "./receipt-parser.mjs";
+import {
+  PADUCAH_GO_PROGRAM_ID,
+  getRegistrationSettings,
+  isPrivateAccessTokenValid,
+  verifyResumeTokenActive,
+  evaluateRegistrationAccess,
+  registrationClosedPayload,
+  getRegistrationOverview,
+  updateRegistrationSettings,
+  isAuthorizedForSettingsChange,
+} from "./registration-status.js";
 
 const MAX_SIGNATURE_DATA_URL_BYTES = 1024 * 1024;
 const MAX_TYPED_SIGNATURE_LEN = 120;
@@ -292,8 +303,33 @@ export default {
       );
     }
 
+    if (
+      url.pathname === "/api/admin/registration-status" &&
+      request.method === "GET"
+    ) {
+      return handleAdminRegistrationStatusGet(request, env);
+    }
+    if (
+      url.pathname === "/api/admin/registration-status" &&
+      request.method === "PUT"
+    ) {
+      return handleAdminRegistrationStatusUpdate(request, env);
+    }
+    if (url.pathname === "/api/admin/registration-status") {
+      return json(
+        { ok: false, error: "Method not allowed" },
+        405,
+        request,
+        env,
+      );
+    }
+
     if (url.pathname.startsWith("/api/")) {
       return json({ ok: false, error: "Not found" }, 404, request, env);
+    }
+
+    if (url.pathname === "/" || url.pathname === "/index.html") {
+      return handleRegistrationLandingPage(request, env);
     }
 
     return env.ASSETS.fetch(request);
@@ -313,6 +349,16 @@ async function handleResumeContext(request, env) {
   const resumeToken = String(payload?.resumeToken || "").trim();
   if (!resumeToken)
     return json({ ok: false, error: "Missing resumeToken" }, 400, request, env);
+
+  const registrationGate = await evaluateResumeGate(env, payload);
+  if (!registrationGate.allowed) {
+    return json(
+      registrationClosedPayload(registrationGate.settings),
+      403,
+      request,
+      env,
+    );
+  }
 
   return proxyContinuationRequest(request, env, {
     action: "resume_context",
@@ -344,12 +390,36 @@ async function handleResumeComplete(request, env) {
     );
   }
 
+  const registrationGate = await evaluateResumeGate(env, payload);
+  if (!registrationGate.allowed) {
+    return json(
+      registrationClosedPayload(registrationGate.settings),
+      403,
+      request,
+      env,
+    );
+  }
+
   return proxyContinuationRequest(request, env, {
     action: "resume_complete",
     resumeToken,
     registrationSubmissionId,
     playerCount,
   });
+}
+
+// resume/context and resume/complete validate the resume token themselves (by proxying to the
+// continuation service), so the gate here only needs to check the allow-resume/private-access
+// flags - it must not re-verify the token itself or every resume call doubles its Apps Script hits.
+async function evaluateResumeGate(env, payload) {
+  const settings = await getRegistrationSettings(env, PADUCAH_GO_PROGRAM_ID);
+  if (settings.registrationStatus === "open") {
+    return { allowed: true, settings };
+  }
+  if (await isPrivateAccessTokenValid(settings, payload?.privateAccessToken)) {
+    return { allowed: true, settings };
+  }
+  return { allowed: settings.allowDraftResume, settings };
 }
 
 async function handleResumeWithdrawVerify(request, env) {
@@ -483,7 +553,7 @@ async function proxyContinuationRequest(request, env, payload) {
   }
 }
 
-function handlePublicConfig(env, request) {
+async function handlePublicConfig(env, request) {
   const googleMapsApiKey = String(env.GOOGLE_MAPS_API_KEY || "").trim();
   const corsHeaders = buildCorsHeaders(request, env);
   const paymentConfig = buildPaymentConfig({
@@ -491,9 +561,22 @@ function handlePublicConfig(env, request) {
     playerCount: 1,
     currency: "USD",
   });
+  const registrationSettings = await getRegistrationSettings(
+    env,
+    PADUCAH_GO_PROGRAM_ID,
+  );
+  const registration = {
+    status: registrationSettings.registrationStatus,
+    message:
+      registrationSettings.registrationStatus === "open"
+        ? registrationSettings.publicMessage || null
+        : registrationSettings.closedMessage,
+    allowDraftResume: registrationSettings.allowDraftResume,
+    reopensAt: registrationSettings.reopensAt,
+  };
 
   return new Response(
-    JSON.stringify({ googleMapsApiKey, payment: paymentConfig }),
+    JSON.stringify({ googleMapsApiKey, payment: paymentConfig, registration }),
     {
       status: 200,
       headers: {
@@ -504,6 +587,120 @@ function handlePublicConfig(env, request) {
       },
     },
   );
+}
+
+async function handleAdminRegistrationStatusGet(request, env) {
+  if (!isAuthorizedForSettingsChange(request, env)) {
+    return new Response("Unauthorized", { status: 401 });
+  }
+  const overview = await getRegistrationOverview(env, PADUCAH_GO_PROGRAM_ID);
+  return json(
+    {
+      ok: true,
+      settings: overview.settings,
+      activeDrafts: overview.activeDrafts,
+      submittedCount: overview.submittedCount,
+    },
+    200,
+    request,
+    env,
+  );
+}
+
+async function handleAdminRegistrationStatusUpdate(request, env) {
+  if (!isAuthorizedForSettingsChange(request, env)) {
+    return new Response("Unauthorized", { status: 401 });
+  }
+  const payload = await request.json().catch(() => null);
+  if (!payload || typeof payload !== "object") {
+    return json({ ok: false, error: "Invalid JSON" }, 400, request, env);
+  }
+  if (payload.confirm !== true) {
+    return json(
+      { ok: false, error: "Missing explicit confirm flag" },
+      400,
+      request,
+      env,
+    );
+  }
+  const actorLabel = String(payload.actorLabel || "").trim() || "unknown admin";
+  try {
+    const settings = await updateRegistrationSettings(
+      env,
+      PADUCAH_GO_PROGRAM_ID,
+      payload,
+      actorLabel,
+    );
+    return json({ ok: true, settings }, 200, request, env);
+  } catch (error) {
+    return json(
+      { ok: false, error: String(error?.message || error) },
+      500,
+      request,
+      env,
+    );
+  }
+}
+
+// Server-renders the registration landing page's open/closed shell (via HTMLRewriter) so the
+// correct state is present in the HTML itself, not applied afterward by client JS.
+async function handleRegistrationLandingPage(request, env) {
+  const assetResponse = await env.ASSETS.fetch(request);
+  const contentType = assetResponse.headers.get("Content-Type") || "";
+  if (!assetResponse.ok || !contentType.includes("text/html")) {
+    return assetResponse;
+  }
+
+  const url = new URL(request.url);
+  const settings = await getRegistrationSettings(env, PADUCAH_GO_PROGRAM_ID);
+
+  let effectivelyOpen = settings.registrationStatus === "open";
+  if (!effectivelyOpen) {
+    const privateOk = await isPrivateAccessTokenValid(
+      settings,
+      url.searchParams.get("pk"),
+    );
+    if (privateOk) {
+      effectivelyOpen = true;
+    } else if (settings.allowDraftResume) {
+      const resumeToken = url.searchParams.get("resume") || "";
+      if (resumeToken && (await verifyResumeTokenActive(env, resumeToken))) {
+        effectivelyOpen = true;
+      }
+    }
+  }
+
+  const flowParam = (url.searchParams.get("flow") || "").toLowerCase();
+  const isPrivilegedFlow = flowParam === "volunteer" || flowParam === "coach";
+  const showClosedNotice = !effectivelyOpen && !isPrivilegedFlow;
+
+  const rewriter = new HTMLRewriter()
+    .on("html", {
+      element(el) {
+        if (showClosedNotice) el.setAttribute("class", "registration-is-closed");
+        el.setAttribute(
+          "data-registration-status",
+          showClosedNotice ? "closed" : "open",
+        );
+        if (settings.reopensAt) {
+          el.setAttribute("data-registration-reopens-at", settings.reopensAt);
+        }
+      },
+    })
+    .on("#registration-closed-message", {
+      element(el) {
+        el.setInnerContent(settings.closedMessage);
+      },
+    });
+
+  const rewritten = rewriter.transform(assetResponse);
+  const headers = new Headers(rewritten.headers);
+  headers.set("Cache-Control", "private, no-store");
+  return new Response(rewritten.body, {
+    status: rewritten.status,
+    statusText: rewritten.statusText,
+    headers,
+  });
 }
 
 function handlePaymentSession(request, env) {
@@ -894,6 +1091,29 @@ async function handleFormUpsert(request, env) {
     );
   }
 
+  // Only player (mls_registration) drafts/submissions are gated by the closed-registration
+  // control; volunteer/coaching applications remain unaffected, matching current behavior.
+  if (formType === "mls_registration") {
+    const registrationSettings = await getRegistrationSettings(
+      env,
+      PADUCAH_GO_PROGRAM_ID,
+    );
+    const access = await evaluateRegistrationAccess(env, {
+      settings: registrationSettings,
+      resumeToken: payload.resumeToken,
+      privateAccessToken: payload.privateAccessToken,
+      requireResumeReverification: true,
+    });
+    if (!access.allowed) {
+      return json(
+        registrationClosedPayload(registrationSettings),
+        403,
+        request,
+        env,
+      );
+    }
+  }
+
   const params = new URLSearchParams();
   params.append("form_type", formType);
   Object.entries(values).forEach(([key, value]) => {
@@ -981,6 +1201,29 @@ async function handleFinalConfirmationEmail(request, env) {
   const payload = await request.json().catch(() => null);
   if (!payload || typeof payload !== "object") {
     return json({ ok: false, error: "Invalid JSON" }, 400, request, env);
+  }
+
+  // Only gate the player-registration final confirmation (identified by
+  // registrationSubmissionId); volunteer/coaching confirmations are unaffected.
+  if (payload.registrationSubmissionId) {
+    const registrationSettings = await getRegistrationSettings(
+      env,
+      PADUCAH_GO_PROGRAM_ID,
+    );
+    const access = await evaluateRegistrationAccess(env, {
+      settings: registrationSettings,
+      resumeToken: payload.resumeToken,
+      privateAccessToken: payload.privateAccessToken,
+      requireResumeReverification: true,
+    });
+    if (!access.allowed) {
+      return json(
+        registrationClosedPayload(registrationSettings),
+        403,
+        request,
+        env,
+      );
+    }
   }
 
   const recipientEmail = String(payload.recipientEmail || "").trim();

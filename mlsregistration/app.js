@@ -408,6 +408,9 @@
   let isSubmittingStage = false;
   let registrationResumeState = null;
   let withdrawalVerificationToken = "";
+  const privateAccessToken = String(
+    new URLSearchParams(window.location.search).get("pk") || "",
+  ).trim();
 
   buildPage();
   updatePaymentPageNote();
@@ -444,7 +447,7 @@
     const response = await fetchWithTimeout(RESUME_CONTEXT_ENDPOINT, {
       method: "POST",
       headers: { "Content-Type": "application/json", Accept: "application/json" },
-      body: JSON.stringify({ resumeToken }),
+      body: JSON.stringify({ resumeToken, privateAccessToken: privateAccessToken || undefined }),
     }, FORM_UPSERT_TIMEOUT_MS);
 
     const payload = await response.json().catch(() => null);
@@ -2890,6 +2893,7 @@
         resumeToken: registrationResumeState.token,
         registrationSubmissionId,
         playerCount: completedRegistrationData?.players?.length || selectedPlayerCount(),
+        privateAccessToken: privateAccessToken || undefined,
       }),
     }, FORM_UPSERT_TIMEOUT_MS);
     const payload = await response.json().catch(() => null);
@@ -3623,6 +3627,8 @@
         paymentAmount: descriptor.paymentRequired ? String(calculateRegistrationFeeAmount()) : "",
         signedDocumentUrls,
         sourceUrl: window.location.href,
+        resumeToken: registrationResumeState?.token || undefined,
+        privateAccessToken: privateAccessToken || undefined,
       }),
     }, FINAL_CONFIRMATION_TIMEOUT_MS);
 
@@ -3746,6 +3752,8 @@
             ...values,
             defer_confirmation_email: values?.defer_confirmation_email || "yes",
           },
+          resumeToken: registrationResumeState?.token || undefined,
+          privateAccessToken: privateAccessToken || undefined,
         }),
       }, FORM_UPSERT_TIMEOUT_MS);
       payload = await res.json().catch(() => null);

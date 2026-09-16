@@ -1,0 +1,137 @@
+:root {
+  --ink: #10131d;
+  --muted: #516173;
+  --card: #ffffff;
+  --line: #d9dfea;
+  --brand: #6f2dbd;
+  --danger: #b61d2b;
+  --warn-bg: #fff6e5;
+  --warn-border: #e8b93b;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: "Segoe UI", Arial, sans-serif;
+  color: var(--ink);
+  background: #f4f5f8;
+}
+
+.admin-shell {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 32px 20px 80px;
+}
+
+.eyebrow {
+  color: var(--brand);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  margin: 0 0 4px;
+}
+
+.subtitle {
+  color: var(--muted);
+}
+
+section {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 20px;
+  margin-top: 20px;
+}
+
+label {
+  display: block;
+  font-weight: 600;
+  margin: 12px 0 4px;
+}
+
+label.radio,
+label.checkbox {
+  font-weight: 400;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+input[type="text"],
+input[type="password"],
+input[type="datetime-local"],
+textarea {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-size: 1rem;
+}
+
+button {
+  margin-top: 16px;
+  padding: 10px 18px;
+  border-radius: 8px;
+  border: none;
+  background: var(--brand);
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+button:disabled {
+  background: #b7abcd;
+  cursor: not-allowed;
+}
+
+dl {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+dl div {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+
+dt {
+  font-size: 0.8rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+dd {
+  margin: 4px 0 0;
+  font-weight: 600;
+}
+
+.warning-box {
+  margin-top: 16px;
+  background: var(--warn-bg);
+  border: 1px solid var(--warn-border);
+  border-radius: 8px;
+  padding: 12px 16px;
+}
+
+.hint {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+#status-message {
+  min-height: 1.2em;
+  font-weight: 600;
+}
+
+#status-message[data-tone="error"] {
+  color: var(--danger);
+}
+
+#status-message[data-tone="success"] {
+  color: #1b7a3c;
+}

@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Registration Settings | Paducah GO Soccer League Admin</title>
+    <meta name="robots" content="noindex,nofollow" />
+    <link rel="stylesheet" href="./admin-registration-status.css?v=2026-09-15-1" />
+  </head>
+  <body>
+    <main class="admin-shell">
+      <header>
+        <p class="eyebrow">Settings &rarr; Registration Settings</p>
+        <h1>Paducah GO Soccer League &mdash; Registration Overview</h1>
+        <p class="subtitle">
+          Controls whether the public MLS GO registration routes accept new players. This
+          setting is stored server-side in D1 and does not depend on client-side JavaScript to
+          be enforced &mdash; this page is only the admin control surface.
+        </p>
+      </header>
+
+      <section class="auth-card" id="auth-card">
+        <label for="admin-token">Admin settings token</label>
+        <input
+          type="password"
+          id="admin-token"
+          autocomplete="off"
+          placeholder="Paste the ADMIN_SETTINGS_TOKEN bearer value"
+        />
+        <button type="button" id="load-settings-btn">Load current settings</button>
+        <p class="hint">
+          Never share this token in chat, email, or a URL. It is kept only in this browser
+          tab's session storage and is sent solely as an Authorization header.
+        </p>
+      </section>
+
+      <p id="status-message" role="status" aria-live="polite"></p>
+
+      <section class="overview-card" id="overview-card" hidden>
+        <h2>Overview</h2>
+        <dl>
+          <div><dt>Current status</dt><dd id="ov-status">&mdash;</dd></div>
+          <div><dt>Last changed by</dt><dd id="ov-updated-by">&mdash;</dd></div>
+          <div><dt>Last changed at</dt><dd id="ov-updated-at">&mdash;</dd></div>
+          <div><dt>Scheduled reopening</dt><dd id="ov-reopens-at">&mdash;</dd></div>
+          <div><dt>Active drafts</dt><dd id="ov-active-drafts">&mdash;</dd></div>
+          <div><dt>Registrations submitted</dt><dd id="ov-submitted-count">&mdash;</dd></div>
+        </dl>
+      </section>
+
+      <section class="settings-form" id="settings-form" hidden>
+        <h2>Registration Settings</h2>
+
+        <fieldset>
+          <legend>Status</legend>
+          <label class="radio">
+            <input type="radio" name="registrationStatus" value="open" id="status-open" />
+            Registration Open
+          </label>
+          <label class="radio">
+            <input type="radio" name="registrationStatus" value="closed" id="status-closed" />
+            Registration Closed
+          </label>
+        </fieldset>
+
+        <div id="closed-options">
+          <fieldset>
+            <legend>While closed</legend>
+            <label class="checkbox">
+              <input type="checkbox" id="allow-draft-resume" />
+              Allow existing registrations to resume (valid, unexpired resume links continue working)
+            </label>
+            <label class="checkbox">
+              <input type="checkbox" id="allow-private-access" />
+              Allow a private/administrative registration link
+            </label>
+            <label for="private-access-token">New private access token (optional &mdash; leave blank to keep current)</label>
+            <input type="text" id="private-access-token" autocomplete="off" placeholder="Only set when issuing/rotating a private link" />
+          </fieldset>
+
+          <label for="closed-message">Closed-registration message</label>
+          <textarea id="closed-message" rows="3"></textarea>
+        </div>
+
+        <label for="reopens-at">Reopening date/time (optional, informational only)</label>
+        <input type="datetime-local" id="reopens-at" />
+
+        <label for="actor-label">Your name (recorded in the audit log)</label>
+        <input type="text" id="actor-label" autocomplete="off" placeholder="e.g. Jordan Smith" />
+
+        <div class="warning-box" id="close-warning" hidden>
+          <strong>Before you close registration:</strong>
+          <ul>
+            <li>New registrations will be blocked immediately.</li>
+            <li>Existing drafts will be preserved, not deleted.</li>
+            <li>Existing resume behavior depends on the "allow resume" setting above.</li>
+            <li>Previously submitted records, agreements, payments, and Google Sheets data will not be deleted.</li>
+          </ul>
+        </div>
+
+        <label class="checkbox confirm-checkbox">
+          <input type="checkbox" id="confirm-change" />
+          I understand the effects of this change and want to apply it.
+        </label>
+
+        <button type="button" id="apply-btn" disabled>Apply change</button>
+      </section>
+    </main>
+    <script src="./admin-registration-status.js?v=2026-09-15-1"></script>
+  </body>
+</html>

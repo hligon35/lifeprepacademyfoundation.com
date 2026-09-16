@@ -214,3 +214,81 @@ wrangler r2 bucket create site-admin
 # secrets to add once admin auth model is decided (§4.4), e.g.:
 wrangler secret put ADMIN_SESSION_SECRET --config wrangler.jsonc
 ```
+
+---
+
+## 6. Registration-status control (Paducah GO Soccer League) — implemented
+
+A program-scoped, D1-backed open/closed control for player registration, built as a discrete
+increment ahead of the full Phase 10 admin/RBAC system. Scoped to `paducah-go-soccer-league` only;
+`paducah-nfl-flag-football` / `-clinic` are unaffected (each program has its own `registration_settings`
+row when/if created).
+
+### 6.1 What was added
+- `mlsregistration/worker/migrations/0007_registration_settings.sql` — new `registration_settings`
+  table (`program_id` PK/FK, `registration_status`, `allow_draft_resume`, `allow_private_access`,
+  `private_access_token_hash`, `public_message`, `closed_message`, `reopens_at`, `updated_at`,
+  `updated_by`). Seeded row for Paducah GO is `closed`, matching the prior production default
+  (`REGISTRATION_OPEN = false` in the retired `flow-gate.js`) — this migration alone changes nothing
+  for end users.
+- `mlsregistration/worker/registration-status.js` — CommonJS module (bundler-importable + directly
+  `require()`-testable under plain `node:test`, matching the existing `payment-config.js` pattern).
+  Exports the D1 reads/writes, the access-decision function (`evaluateRegistrationAccess`), audit
+  logging, and admin-token auth check.
+- `index.js` wiring:
+  - `handlePublicConfig` is now `async` and returns a `registration: {status, message,
+    allowDraftResume, reopensAt}` block.
+  - `handleFormUpsert` gates only `formType === "mls_registration"` (volunteer/coaching untouched).
+  - `handleFinalConfirmationEmail` gates only when `payload.registrationSubmissionId` is present.
+  - `handleResumeContext` / `handleResumeComplete` gate on allow-resume/private-access flags without
+    double-verifying the resume token (they already validate it via the continuation service).
+  - New `handleRegistrationLandingPage` uses `HTMLRewriter` to server-render the closed state (and
+    the closed message) into `/` and `/index.html` directly — the closed state is enforced and
+    rendered server-side, not solely by client JS. Respects `?flow=volunteer`/`?flow=coach` (never
+    gated) and `?pk=`/`?resume=` (private-access / valid-resume bypass), matching prior client-only
+    behavior in intent.
+  - New admin routes: `GET /api/admin/registration-status`, `PUT /api/admin/registration-status`
+    (requires `{confirm: true}` and a bearer token matching `env.ADMIN_SETTINGS_TOKEN`).
+- `wrangler.jsonc` — `assets.run_worker_first` now includes `"/"` and `"/index.html"` so the Worker
+  (not the static asset binding) serves the landing page and can rewrite it.
+- `mlsregistration/flow-gate.js` retired (`git rm`) — its class-toggle logic is now applied
+  server-side. `mlsregistration/index.html` had the script tag removed and gained
+  `id="registration-closed-message"` / `id="registration-reopens-at"` for the rewriter to target.
+- `mlsregistration/app.js` — captures `?pk=` as `privateAccessToken`; both it and
+  `registrationResumeState.token` are now sent as top-level fields on `resume/context`,
+  `resume/complete`, `forms/upsert`, and `final-confirmation-email` requests.
+- `mlsregistration/admin-registration-status.html` / `.js` / `.css` — minimal standalone admin page
+  (interim, ahead of Phase 10 real RBAC). Bearer token entered by the admin and kept only in
+  `sessionStorage`; shows current status + audit metadata + active-draft/submitted counts; requires
+  an explicit "I understand" confirmation checkbox before applying a change, with a warning box shown
+  when switching to closed. Uses `fetch()`, not a native `<form>` submit, so the site's
+  `form-action` CSP directive (scoped to `https://docs.google.com`) is not implicated.
+- `mlsregistration/worker/registration-status.test.js` — 15 `node:test` cases using a thin D1-API
+  adapter over `node:sqlite`'s `DatabaseSync`, loaded with the **real** migration SQL files
+  (0001–0007). Covers: open access, closed+no-bypass block, closed+draft-resume with a re-verified
+  token, closed+fabricated-token block, reopening + audit_log row, program isolation, admin-token
+  auth (present/wrong/missing/unconfigured), private-access token valid/invalid, payload shape, and
+  "no stale caching" (every read re-queries D1). All passing (`node --test
+  mlsregistration/worker/registration-status.test.js`).
+
+### 6.2 Honest caveats / follow-ups
+- **Admin auth is interim.** `ADMIN_SETTINGS_TOKEN` is a single shared bearer secret, mirroring the
+  existing `ADMIN_DOWNLOAD_TOKEN` pattern — not per-user, not role-scoped. Replace with real
+  Phase 10 RBAC sessions when that lands.
+- **`activeDrafts` / `submittedCount` will read 0 today.** Nothing yet writes to `registration_drafts`
+  / `registrations` (that's the rest of Phase 4's write-through wiring), so the admin overview's
+  counts are accurate-but-empty until that lands.
+- **New required secret:** `ADMIN_SETTINGS_TOKEN` (not yet set — run
+  `wrangler secret put ADMIN_SETTINGS_TOKEN --config wrangler.jsonc` before relying on the admin page
+  against a real deployment; until it's set, `isAuthorizedForSettingsChange` fails closed and the
+  admin routes always return 401).
+- **Legacy dead code confirmed, left untouched:** `mlsregistration/worker/resume-status.js` (client
+  UI text toggler) and `mlsregistration/worker/resume-endpoints.js` (an older, unused
+  `handleResumeContext`/`handleResumeComplete` pair with the same names as the live handlers in
+  `index.js`) are not imported anywhere (`grep` confirmed zero references). They were not touched —
+  removing dead code is outside this feature's scope — but they should not be confused with the live,
+  gated handlers in `index.js`.
+- **Migration 0007 applied and spot-checked** against the local D1 emulation
+  (`wrangler d1 migrations apply lpaf-db --local`); not yet applied to any remote database (no remote
+  `lpaf-db` exists yet — see §5).
+
