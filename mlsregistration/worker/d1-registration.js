@@ -251,9 +251,12 @@ export async function updateAgreementInD1(env, input) {
   ).bind(submissionId).first();
   if (!registration?.id) return { ok: false, missing: true };
 
-  const documentType = text(input?.agreementType) === "player"
+  const agreementType = text(input?.agreementType).toLowerCase();
+  const documentType = agreementType === "player"
     ? "player_agreement"
-    : "volunteer_agreement";
+    : agreementType === "ppf" || agreementType === "ppf_liability"
+      ? "ppf_liability"
+      : "volunteer_agreement";
   const documentId = `${registration.id}-${documentType}`;
   await env.DB.prepare(`
     INSERT INTO registration_documents (
@@ -273,7 +276,7 @@ export async function updateAgreementInD1(env, input) {
     registration.id,
     documentType,
     text(input?.status).toLowerCase().includes("fail") ? "failed" : "generated",
-    text(input?.objectKey),
+    text(input?.objectKey || input?.fileId),
     text(input?.sha256),
     text(input?.transactionId),
     text(input?.signedAt),
