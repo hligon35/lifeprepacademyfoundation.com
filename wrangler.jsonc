@@ -4,7 +4,15 @@
 	"main": "mlsregistration/worker/index.js",
 	"routes": [
 		{
-			"pattern": "programs.lifeprepacademyfoundation.com/*",
+			"pattern": "paducahgo.lifeprepacademyfoundation.com/*",
+			"zone_name": "lifeprepacademyfoundation.com"
+		},
+		{
+			"pattern": "lifeprepacademyfoundation.com/admin*",
+			"zone_name": "lifeprepacademyfoundation.com"
+		},
+		{
+			"pattern": "www.lifeprepacademyfoundation.com/admin*",
 			"zone_name": "lifeprepacademyfoundation.com"
 		}
 	],
@@ -15,7 +23,9 @@
 		"run_worker_first": [
 			"/api/*",
 			"/",
-			"/index.html"
+			"/index.html",
+			"/admin",
+			"/admin/*"
 		]
 	},
 	"durable_objects": {
@@ -66,7 +76,7 @@
 	],
 	"vars": {
 		"PLAYER_SIGNATURE_PLACEMENT_MODE": "parent_guardian_only",
-		"ALLOWED_ORIGINS": "https://programs.lifeprepacademyfoundation.com,https://mlsregistration.lifeprepacademyfoundation.com,https://lifeprepacademyfoundation.com,https://www.lifeprepacademyfoundation.com,https://preview.lifeprepacademyfoundation.com,http://127.0.0.1:3000",
+		"ALLOWED_ORIGINS": "https://paducahgo.lifeprepacademyfoundation.com,https://programs.lifeprepacademyfoundation.com,https://mlsregistration.lifeprepacademyfoundation.com,https://lifeprepacademyfoundation.com,https://www.lifeprepacademyfoundation.com,https://preview.lifeprepacademyfoundation.com,http://127.0.0.1:3000",
 		"E_CONSENT_TEXT_VERSION": "v1-2026-08-06",
 		"APPS_SCRIPT_URL": "https://script.google.com/macros/s/AKfycbwFGPZH8uWVuroO83DbJiyEjohYKaGUfoyMmpiiBTZtkiuF2IOH8L88Jn_iFucCw_Ll9Q/exec",
 		"CONTINUATION_WEB_APP_URL": "https://script.google.com/macros/s/AKfycbxyJDjIgXpfFllY6KsfRSvp797m1nMJwsAM69FpH-tP1IVoGiDOSh-SS43YSE02F0Ro/exec"

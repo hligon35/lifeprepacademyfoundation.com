@@ -340,6 +340,10 @@ export default {
       return handleRegistrationLandingPage(request, env);
     }
 
+    if (url.pathname === "/admin" || url.pathname === "/admin/") {
+      return handleAdminPage(request, env);
+    }
+
     return env.ASSETS.fetch(request);
   },
   async email(message, env, ctx) {
@@ -709,6 +713,13 @@ async function handleRegistrationLandingPage(request, env) {
     statusText: rewritten.statusText,
     headers,
   });
+}
+
+async function handleAdminPage(request, env) {
+  const url = new URL(request.url);
+  // Extensionless path matches the assets binding's canonical URL, avoiding its .html redirect.
+  url.pathname = "/admin-registration-status";
+  return env.ASSETS.fetch(new Request(url.toString(), request));
 }
 
 function handlePaymentSession(request, env) {
