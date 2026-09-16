@@ -55,7 +55,7 @@
     {
       "binding": "DB",
       "database_name": "lpaf-db-preview",
-      "database_id": "00000000-0000-0000-0000-000000000000",
+      "database_id": "ccfc119f-b02c-4ae8-9cfd-ad3d3f92c1b6",
       "migrations_dir": "mlsregistration/worker/migrations"
     }
   ],
