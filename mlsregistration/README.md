@@ -14,7 +14,10 @@ This directory contains the MLS GO registration experience and agreement-signing
    - `mlsregistration/worker/pdf-field-maps.js`
 5. Template integrity hashes:
    - `mlsregistration/worker/template-hashes.js`
-6. Sheets persistence and metadata updates:
+6. D1 persistence and operational data:
+   - `mlsregistration/worker/d1-registration.js`
+   - `mlsregistration/worker/migrations/*.sql`
+7. Google Sheets backup mirror and metadata updates:
    - `mlsregistration/google-apps-script/Code.gs`
 
 ## Agreement Workflow
@@ -161,9 +164,28 @@ The public payment config shape is:
 }
 ```
 
-## Google Apps Script Integration
+## Google Sheets Backup Mirror
 
-`Code.gs` now supports:
+Cloudflare D1 is the primary operational store for MLS GO registrations. The
+Worker writes the registration to D1 first, using the submission ID as the
+idempotency key. After the D1 write succeeds, the Worker sends the same form
+payload to Apps Script as a best-effort Google Sheets backup mirror.
+
+An Apps Script or Sheets outage must not cause a successful D1 registration to
+be rejected. Mirror status is tracked in D1 in `sync_events`, where an admin
+retry process can be added or used to reconcile failures.
+
+Apps Script remains responsible only for the Sheet-compatible backup/update
+contract while the Worker owns operational registration data. New Worker code
+must not use Apps Script for registration lookups, payment receipt lookups,
+resume state, or primary business logic.
+
+The legacy Apps Script project currently contains additional historical email
+and continuation handlers. Those handlers are not part of the D1 primary write
+path and should be retired after the corresponding Worker/D1 services are
+fully enabled and verified in production.
+
+`Code.gs` supports:
 
 1. Idempotent upsert by submission ID for:
    - `mls_registration` (`registration_submission_id`)
