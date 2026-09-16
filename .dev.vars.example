@@ -7,3 +7,6 @@ ADMIN_DOWNLOAD_TOKEN=replace-with-local-token
 PAYMENT_WEBHOOK_TOKEN=replace-with-local-token
 NEWSLETTER_PROVIDER_API_KEY=replace-with-local-provider-key
 NEWSLETTER_WEBHOOK_SECRET=replace-with-local-webhook-secret
+SENDGRID_API_KEY=replace-with-local-sendgrid-key
+SENDGRID_FROM_EMAIL=replace-with-verified-sender@example.com
+SENDGRID_FROM_NAME=LifePrep Academy Foundation
