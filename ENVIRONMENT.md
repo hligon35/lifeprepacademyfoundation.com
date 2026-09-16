@@ -32,6 +32,15 @@ wrangler secret put NEWSLETTER_PROVIDER_API_KEY
 wrangler secret put NEWSLETTER_WEBHOOK_SECRET
 ```
 
+If Worker-owned email delivery is enabled, configure SendGrid separately:
+
+```bash
+wrangler secret put SENDGRID_API_KEY
+```
+
+Set the verified sender address with the non-secret `SENDGRID_FROM_EMAIL` and
+`SENDGRID_FROM_NAME` variables.
+
 Use separate preview and production secrets. Never print or commit secret
 values. Preserve the existing signed-agreement bucket and Durable Object
 workflow separately unless a reviewed migration is completed.
