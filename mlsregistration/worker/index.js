@@ -20,6 +20,14 @@ import {
   updateRegistrationSettings,
   isAuthorizedForSettingsChange,
 } from "./registration-status.js";
+import {
+  findPaymentRegistrationInD1,
+  getRegistrationFromD1,
+  recordSheetsSync,
+  updateAgreementInD1,
+  updatePaymentInD1,
+  upsertRegistrationToD1,
+} from "./d1-registration.js";
 
 const MAX_SIGNATURE_DATA_URL_BYTES = 1024 * 1024;
 const MAX_TYPED_SIGNATURE_LEN = 120;
@@ -1059,15 +1067,6 @@ async function handleFormUpsert(request, env) {
     return json({ ok: false, error: "Origin not allowed" }, 403, request, env);
   }
 
-  if (!env.APPS_SCRIPT_URL || !hasAppsScriptUpdateToken(env)) {
-    return json(
-      { ok: false, error: "Apps Script update configuration is missing" },
-      500,
-      request,
-      env,
-    );
-  }
-
   const payload = await request.json().catch(() => null);
   if (!payload || typeof payload !== "object") {
     return json({ ok: false, error: "Invalid JSON" }, 400, request, env);
@@ -1114,6 +1113,20 @@ async function handleFormUpsert(request, env) {
     }
   }
 
+  let d1Result;
+  try {
+    d1Result = await upsertRegistrationToD1(env, { formType, values });
+  } catch (error) {
+    return json(
+      { ok: false, error: "Registration could not be saved to the primary database" },
+      503,
+      request,
+      env,
+    );
+  }
+
+  // Google Apps Script is now a backup Sheet mirror only. D1 is authoritative;
+  // a mirror outage must not make the successful D1 registration fail.
   const params = new URLSearchParams();
   params.append("form_type", formType);
   Object.entries(values).forEach(([key, value]) => {
@@ -1128,51 +1141,28 @@ async function handleFormUpsert(request, env) {
   });
 
   try {
-    const response = await postAppsScriptFormWithUpdateTokenFallback(
-      env,
-      params,
-    );
-    const text = response.text;
-    const parsed = response.parsed;
-
-    if (!parsed?.ok) {
-      return json(
-        {
-          ok: false,
-          error: parsed?.error || "Apps Script upsert failed",
-          details: parsed || text.slice(0, 500),
-        },
-        502,
-        request,
-        env,
-      );
+    let mirror = { ok: false, error: "Apps Script mirror is not configured" };
+    if (env.APPS_SCRIPT_URL && hasAppsScriptUpdateToken(env)) {
+      const response = await postAppsScriptFormWithUpdateTokenFallback(env, params);
+      mirror = response.parsed?.ok
+        ? { ok: true }
+        : { ok: false, error: response.parsed?.error || "Sheet mirror failed" };
     }
+    await recordSheetsSync(env, {
+      registrationId: d1Result.registrationId,
+      ok: mirror.ok,
+      error: mirror.error,
+    });
 
-    let email = { ok: true, skipped: true, deferred: deferConfirmationEmail };
-    if (!deferConfirmationEmail && formType === "mls_registration") {
-      email = await postRegistrationEmailAction(
-        env,
-        "send_registration_receipt_email",
-        {
-          registration_submission_id: values.registration_submission_id || "",
-          parent_email: values.parent_email || "",
-          parent_name:
-            `${values.parent_first_name || ""} ${values.parent_last_name || ""}`.trim(),
-          participant_names: buildParticipantNames(values),
-        },
-      );
-    } else if (
-      !deferConfirmationEmail &&
-      (formType === "volunteer_application" ||
-        formType === "coaching_application")
-    ) {
-      email = await sendVolunteerCoachConfirmationEmail(env, {
-        formType,
-        submissionId: values.submission_id || "",
-      });
-    }
-
-    return json({ ok: true, result: parsed, email }, 200, request, env);
+    return json({
+      ok: true,
+      result: {
+        ...d1Result,
+        primaryStore: "d1",
+        googleSheetsMirror: mirror,
+      },
+      email: { ok: true, skipped: true, deferred: deferConfirmationEmail, provider: "d1-migration-pending" },
+    }, 200, request, env);
   } catch (error) {
     return json(
       { ok: false, error: String(error?.message || error) },
@@ -2013,6 +2003,7 @@ function decodeDataUrl(dataUrl) {
 }
 
 async function updateAgreementInSheets(env, input) {
+  await updateAgreementInD1(env, input);
   if (!env.APPS_SCRIPT_URL || !hasAppsScriptUpdateToken(env)) {
     return { ok: false, error: "Missing Apps Script update configuration" };
   }
@@ -2123,6 +2114,7 @@ async function handlePpfPdfRender(request, env) {
 }
 
 async function updatePaymentInSheets(env, input) {
+  await updatePaymentInD1(env, input);
   if (!env.APPS_SCRIPT_URL || !hasAppsScriptUpdateToken(env)) {
     return { ok: false, error: "Missing Apps Script update configuration" };
   }
@@ -2243,93 +2235,15 @@ function formatPpfParticipantDivisionLabel(grade, gender) {
 }
 
 async function getRegistrationContext(env, submissionId) {
-  if (!env.APPS_SCRIPT_URL || !hasAppsScriptUpdateToken(env)) {
-    return { ok: false, error: "Missing Apps Script lookup configuration" };
-  }
-
-  const params = new URLSearchParams();
-  params.append("action", "get_registration_context");
-  params.append("form_type", "mls_registration");
-  params.append("submission_id", submissionId);
-
-  try {
-    const response = await postAppsScriptFormWithUpdateTokenFallback(
-      env,
-      params,
-    );
-    const parsed = response.parsed;
-    if (!parsed?.ok) {
-      return {
-        ok: false,
-        error: parsed?.error || "Apps Script context lookup failed",
-      };
-    }
-    return {
-      ok: true,
-      parentEmail: String(parsed.parentEmail || "").trim(),
-      parentName: String(parsed.parentName || "").trim(),
-      participantNames: String(parsed.participantNames || "").trim(),
-      transactionId: String(parsed.transactionId || "").trim(),
-      signedAt: String(parsed.signedAt || "").trim(),
-      paymentStatus: String(parsed.paymentStatus || "").trim(),
-      paymentTransactionId: String(parsed.paymentTransactionId || "").trim(),
-    };
-  } catch (error) {
-    return { ok: false, error: String(error?.message || error) };
-  }
+  const d1Context = await getRegistrationFromD1(env, submissionId);
+  if (d1Context.ok) return d1Context;
+  return d1Context;
 }
 
 async function lookupRegistrationForPaymentReceipt(env, input) {
-  if (!env.APPS_SCRIPT_URL || !hasAppsScriptUpdateToken(env)) {
-    return { ok: false, error: "Missing Apps Script lookup configuration" };
-  }
-
-  const params = new URLSearchParams();
-  params.append("action", "lookup_registration_for_payment_receipt");
-  params.append("form_type", "mls_registration");
-  params.append(
-    "parent_email",
-    String(input.parentEmail || "")
-      .trim()
-      .toLowerCase(),
-  );
-  params.append("parent_name", String(input.parentName || "").trim());
-  params.append("payment_amount", String(input.amount || "").trim());
-  params.append("payment_paid_at", String(input.paidAt || "").trim());
-  params.append(
-    "payment_transaction_id",
-    String(input.paymentTransactionId || "").trim(),
-  );
-  params.append("payment_receipt_url", String(input.receiptUrl || "").trim());
-  params.append("event_name", String(input.eventName || "").trim());
-  params.append("player_count", String(input.playerCount || "").trim());
-
-  try {
-    const response = await postAppsScriptFormWithUpdateTokenFallback(
-      env,
-      params,
-    );
-    const parsed = response.parsed;
-    if (!parsed?.ok) {
-      return {
-        ok: false,
-        error: parsed?.error || "Apps Script payment receipt lookup failed",
-      };
-    }
-    return {
-      ok: true,
-      submissionId: String(parsed.submissionId || "").trim(),
-      parentEmail: String(parsed.parentEmail || "").trim(),
-      parentName: String(parsed.parentName || "").trim(),
-      participantNames: String(parsed.participantNames || "").trim(),
-      transactionId: String(parsed.transactionId || "").trim(),
-      signedAt: String(parsed.signedAt || "").trim(),
-      paymentStatus: String(parsed.paymentStatus || "").trim(),
-      paymentTransactionId: String(parsed.paymentTransactionId || "").trim(),
-    };
-  } catch (error) {
-    return { ok: false, error: String(error?.message || error) };
-  }
+  const d1Lookup = await findPaymentRegistrationInD1(env, input);
+  if (d1Lookup.ok) return d1Lookup;
+  return d1Lookup;
 }
 
 async function resolvePaymentReceiptContext(env, receipt) {
