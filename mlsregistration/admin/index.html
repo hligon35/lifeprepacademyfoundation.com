@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>LifePrep Academy Foundation Admin</title>
+    <meta name="robots" content="noindex,nofollow" />
+    <link rel="stylesheet" href="/admin/admin.css?v=2026-09-16-1" />
+  </head>
+  <body class="admin-body">
+    <div class="admin-app">
+      <header class="admin-topbar">
+        <a class="admin-brand" href="/admin" aria-label="LifePrep Academy Foundation admin home">
+          <img src="https://www.lifeprepacademyfoundation.com/logo.png" alt="" width="48" height="48" />
+          <span>LifePrep Academy Foundation</span>
+        </a>
+        <div class="admin-account">
+          <span id="admin-status" class="status-pill status-pill--loading">Checking access</span>
+          <button id="logout-button" class="button button--quiet" type="button">Log out</button>
+        </div>
+      </header>
+
+      <main class="admin-main" id="admin-dashboard" hidden>
+        <div class="page-heading">
+          <div>
+            <p class="eyebrow">Website dashboard</p>
+            <h1>Submissions inbox</h1>
+            <p class="page-lede">Review messages sent through the LifePrep Academy Foundation website.</p>
+          </div>
+          <a class="button button--primary" href="/admin/programs">Open Programs Dashboard</a>
+        </div>
+
+        <section class="metric-grid" aria-label="Website overview">
+          <article class="metric-card"><span>Total registrations</span><strong id="metric-registrations">—</strong></article>
+          <article class="metric-card"><span>Paid registrations</span><strong id="metric-paid">—</strong></article>
+          <article class="metric-card"><span>Total submissions</span><strong id="metric-submissions">—</strong></article>
+          <article class="metric-card metric-card--accent"><span>Unread submissions</span><strong id="metric-unread">—</strong></article>
+        </section>
+
+        <section class="inbox-card" aria-labelledby="inbox-heading">
+          <div class="section-heading">
+            <div><p class="eyebrow">Inbox</p><h2 id="inbox-heading">Website submissions</h2></div>
+            <button id="refresh-inbox" class="button button--quiet" type="button">Refresh</button>
+          </div>
+          <div class="filter-chips" role="group" aria-label="Submission type filter">
+            <button class="filter-chip is-active" data-filter="all" type="button">All</button>
+            <button class="filter-chip" data-filter="contact" type="button">Contact</button>
+            <button class="filter-chip" data-filter="youth" type="button">Youth programs</button>
+            <button class="filter-chip" data-filter="volunteer" type="button">Volunteer</button>
+            <button class="filter-chip" data-filter="other" type="button">Other</button>
+          </div>
+          <p id="inbox-message" class="inline-message" role="status"></p>
+          <div id="submission-list" class="submission-list"></div>
+        </section>
+      </main>
+
+      <section id="access-required" class="access-card" hidden>
+        <img src="https://www.lifeprepacademyfoundation.com/logo.png" alt="LifePrep Academy Foundation" width="72" height="72" />
+        <p class="eyebrow">Secure administrator access</p>
+        <h1>Sign in to continue</h1>
+        <p id="access-message">Cloudflare Access will authenticate you with the approved Google account.</p>
+        <a class="button button--primary" href="/cdn-cgi/access/login?returnTo=/admin">Continue to secure login</a>
+      </section>
+    </div>
+    <script src="/admin/admin.js?v=2026-09-16-1" defer></script>
+  </body>
+</html>

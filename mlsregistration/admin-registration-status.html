@@ -20,17 +20,11 @@
       </header>
 
       <section class="auth-card" id="auth-card">
-        <label for="admin-token">Admin settings token</label>
-        <input
-          type="password"
-          id="admin-token"
-          autocomplete="off"
-          placeholder="Paste the ADMIN_SETTINGS_TOKEN bearer value"
-        />
-        <button type="button" id="load-settings-btn">Load current settings</button>
+        <p><strong>Secure admin session</strong></p>
+        <p class="hint">This settings page uses the Cloudflare Access session from <a href="/admin">/admin</a>. Sign in there first if the settings cannot be loaded.</p>
+        <button type="button" id="load-settings-btn">Reload current settings</button>
         <p class="hint">
-          Never share this token in chat, email, or a URL. It is kept only in this browser
-          tab's session storage and is sent solely as an Authorization header.
+          Registration settings are stored in D1 and are enforced by the Worker.
         </p>
       </section>
 

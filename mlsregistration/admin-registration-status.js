@@ -1,9 +1,7 @@
 (() => {
   const API_ORIGIN = window.location.origin;
   const STATUS_ENDPOINT = `${API_ORIGIN}/api/admin/registration-status`;
-  const TOKEN_STORAGE_KEY = "lpaf_admin_settings_token";
 
-  const tokenInput = document.getElementById("admin-token");
   const loadBtn = document.getElementById("load-settings-btn");
   const statusMessage = document.getElementById("status-message");
   const overviewCard = document.getElementById("overview-card");
@@ -25,17 +23,10 @@
 
   let currentSettings = null;
 
-  const storedToken = sessionStorage.getItem(TOKEN_STORAGE_KEY);
-  if (storedToken) tokenInput.value = storedToken;
-
   function setMessage(text, tone) {
     statusMessage.textContent = text || "";
     if (tone) statusMessage.setAttribute("data-tone", tone);
     else statusMessage.removeAttribute("data-tone");
-  }
-
-  function getToken() {
-    return String(tokenInput.value || "").trim();
   }
 
   function updateWarningAndButton() {
@@ -72,17 +63,12 @@
   }
 
   async function loadSettings() {
-    const token = getToken();
-    if (!token) {
-      setMessage("Enter the admin settings token first.", "error");
-      return;
-    }
-    sessionStorage.setItem(TOKEN_STORAGE_KEY, token);
     setMessage("Loading current settings…");
     try {
       const response = await fetch(STATUS_ENDPOINT, {
         method: "GET",
-        headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
+        credentials: "include",
+        headers: { Accept: "application/json" },
       });
       if (response.status === 401) {
         setMessage("Unauthorized. Check the token and try again.", "error");
@@ -102,11 +88,6 @@
   }
 
   async function applyChange() {
-    const token = getToken();
-    if (!token) {
-      setMessage("Enter the admin settings token first.", "error");
-      return;
-    }
     if (!confirmCheckbox.checked) {
       setMessage("Please confirm the change before applying it.", "error");
       return;
@@ -129,8 +110,8 @@
     try {
       const response = await fetch(STATUS_ENDPOINT, {
         method: "PUT",
+        credentials: "include",
         headers: {
-          Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
           Accept: "application/json",
         },
@@ -152,5 +133,5 @@
   loadBtn.addEventListener("click", loadSettings);
   applyBtn.addEventListener("click", applyChange);
 
-  if (storedToken) loadSettings();
+  loadSettings();
 })();

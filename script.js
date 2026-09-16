@@ -117,7 +117,12 @@ function initContactFormNetworkHandler() {
 
     const statusDiv = document.getElementById('contact-form-status');
     const submitBtn = document.getElementById('contactSubmitBtn');
-    const FETCH_URL = form.getAttribute('action');
+    // Website submissions are stored in Cloudflare D1 so the admin inbox is not
+    // dependent on Google Apps Script. MLS registration mirroring remains handled
+    // by the registration Worker separately.
+    const FETCH_URL = form.id === 'contactForm'
+        ? 'https://mlsregistration.lifeprepacademyfoundation.com/api/site-submissions'
+        : form.getAttribute('action');
     const captchaContainer = document.getElementById('captchaContainer');
     const turnstileEnabled = initTurnstileWidget();
 

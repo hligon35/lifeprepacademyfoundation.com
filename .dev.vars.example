@@ -1,4 +1,10 @@
 # Copy to .dev.vars for local Wrangler development. Never commit .dev.vars.
+ADMIN_DEV_EMAIL=admin@example.com
+ADMIN_DEV_TOKEN=replace-with-local-admin-token
+ADMIN_BOOTSTRAP_EMAIL=admin@example.com
+CF_ACCESS_TEAM_DOMAIN=
+CF_ACCESS_AUD=
+TURNSTILE_SECRET=
 APPS_SCRIPT_UPDATE_TOKEN=replace-with-local-token
 AGREEMENT_UPDATE_TOKEN=replace-with-local-token
 CONTINUATION_WORKER_SHARED_SECRET=replace-with-local-secret

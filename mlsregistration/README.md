@@ -238,6 +238,27 @@ Added to end of applicable tabs:
 
 1. Admin route: `/api/admin/agreement/{transactionId}`
 2. Requires header: `Authorization: Bearer <ADMIN_DOWNLOAD_TOKEN>`
+
+## Admin Dashboard and Cloudflare Access
+
+The administrative UI is served at `/admin` and uses the following flow:
+
+1. Cloudflare Access authenticates the approved Google account.
+2. The Worker validates `CF-Access-Jwt-Assertion` against the Access team's JWKS.
+3. D1 checks the authenticated email against `admin_users` and program-scoped RBAC.
+4. The dashboard loads the D1-backed website submissions inbox and analytics.
+5. `/admin/programs` displays the program selector; Paducah GO Soccer League is
+   currently the first program dashboard shell.
+
+The first approved account can be provisioned by setting the production Worker
+var `ADMIN_BOOTSTRAP_EMAIL`. After its first successful Access login, remove or
+clear the bootstrap value and manage subsequent users through the D1 admin/RBAC
+workflow.
+
+Website contact submissions are stored in the `site_submissions` D1 table through
+`POST /api/site-submissions`. The public contact form's JavaScript posts to this
+Worker endpoint; the MLS registration path continues to write D1 first and mirror
+the same data to Google Sheets as a backup.
 3. Signer route: `/api/signer/agreement/{transactionId}?exp=...&sig=...`
 4. Signer URL is short-lived and HMAC-protected.
 

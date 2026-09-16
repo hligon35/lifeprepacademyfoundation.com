@@ -18,7 +18,6 @@ import {
   registrationClosedPayload,
   getRegistrationOverview,
   updateRegistrationSettings,
-  isAuthorizedForSettingsChange,
 } from "./registration-status.js";
 import {
   findPaymentRegistrationInD1,
@@ -28,6 +27,8 @@ import {
   updatePaymentInD1,
   upsertRegistrationToD1,
 } from "./d1-registration.js";
+import { adminError, getAdminContext } from "./admin-auth.js";
+import { handleAdminApi } from "./admin-api.js";
 
 const MAX_SIGNATURE_DATA_URL_BYTES = 1024 * 1024;
 const MAX_TYPED_SIGNATURE_LEN = 120;
@@ -142,6 +143,24 @@ export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
 
+    if (isPgsHost(url.hostname)) {
+      if (url.pathname === "/" || url.pathname === "/index.html") {
+        return handleAdminAssetPage(request, env, "/admin/programs/pgs/index.html");
+      }
+      if (url.pathname === "/parent" || url.pathname === "/parent/") {
+        return handleAdminAssetPage(request, env, "/admin/programs/pgs/index.html", "parent");
+      }
+      if (url.pathname === "/coach" || url.pathname === "/coach/") {
+        return handleAdminAssetPage(request, env, "/admin/programs/pgs/index.html", "coach");
+      }
+      if (url.pathname === "/volunteer" || url.pathname === "/volunteer/") {
+        return handleAdminAssetPage(request, env, "/admin/programs/pgs/index.html", "volunteer");
+      }
+      if (["/schedule", "/team-roster", "/uniform-re-order", "/merch", "/contact"].includes(url.pathname)) {
+        return handleAdminAssetPage(request, env, "/admin/programs/pgs/index.html", "parent");
+      }
+    }
+
     if (request.method === "OPTIONS" && url.pathname.startsWith("/api/")) {
       return handleApiOptions(request, env);
     }
@@ -159,6 +178,13 @@ export default {
         request,
         env,
       );
+    }
+
+    if (url.pathname === "/api/site-submissions" && request.method === "POST") {
+      return handleSiteSubmission(request, env);
+    }
+    if (url.pathname === "/api/site-submissions") {
+      return json({ ok: false, error: "Method not allowed" }, 405, request, env);
     }
 
     if (url.pathname === "/api/sign-agreement" && request.method === "POST") {
@@ -332,6 +358,10 @@ export default {
       );
     }
 
+    if (url.pathname.startsWith("/api/admin/")) {
+      return handleAdminApi(request, env);
+    }
+
     if (url.pathname.startsWith("/api/")) {
       return json({ ok: false, error: "Not found" }, 404, request, env);
     }
@@ -341,7 +371,19 @@ export default {
     }
 
     if (url.pathname === "/admin" || url.pathname === "/admin/") {
-      return handleAdminPage(request, env);
+      return handleAdminAssetPage(request, env, "/admin/index.html");
+    }
+    if (url.pathname === "/admin/dashboard" || url.pathname === "/admin/dashboard/") {
+      return handleAdminAssetPage(request, env, "/admin/index.html");
+    }
+    if (url.pathname === "/admin/programs" || url.pathname === "/admin/programs/") {
+      return handleAdminAssetPage(request, env, "/admin/programs/index.html");
+    }
+    if (
+      url.pathname === "/admin/programs/paducah-go-soccer-league" ||
+      url.pathname === "/admin/programs/paducah-go-soccer-league/"
+    ) {
+      return handleAdminAssetPage(request, env, "/admin/programs/pgs/index.html");
     }
 
     return env.ASSETS.fetch(request);
@@ -350,6 +392,18 @@ export default {
     await handlePaymentReceiptEmail(message, env, ctx);
   },
 };
+
+function isPgsHost(hostname) {
+  return String(hostname || "").toLowerCase() === "pgs.lifeprepacademyfoundation.com";
+}
+
+function handleAdminAssetPage(request, env, assetPath, role = "") {
+  const url = new URL(request.url);
+  url.pathname = assetPath;
+  if (role) url.searchParams.set("role", role);
+  const assetRequest = new Request(url.toString(), request);
+  return env.ASSETS.fetch(assetRequest);
+}
 
 async function handleResumeContext(request, env) {
   const origin = request.headers.get("Origin") || "";
@@ -565,6 +619,62 @@ async function proxyContinuationRequest(request, env, payload) {
   }
 }
 
+async function handleSiteSubmission(request, env) {
+  const origin = request.headers.get("Origin") || "";
+  if (origin && !isAllowedOrigin(origin, env.ALLOWED_ORIGINS || "", request.url)) {
+    return json({ ok: false, error: "Origin not allowed" }, 403, request, env);
+  }
+  if (!env?.DB) return json({ ok: false, error: "D1 binding is not configured" }, 503, request, env);
+
+  const contentType = request.headers.get("Content-Type") || "";
+  let values = {};
+  if (contentType.includes("application/x-www-form-urlencoded") || contentType.includes("multipart/form-data")) {
+    const form = await request.formData().catch(() => null);
+    if (!form) return json({ ok: false, error: "Invalid form data" }, 400, request, env);
+    for (const [key, value] of form.entries()) values[key] = String(value);
+  } else {
+    values = await request.json().catch(() => null);
+  }
+  if (!values || typeof values !== "object") {
+    return json({ ok: false, error: "Invalid submission" }, 400, request, env);
+  }
+
+  if (String(values.hp_field || "").trim()) {
+    return json({ status: "success", message: "Processed." }, 200, request, env);
+  }
+
+  const name = String(values.name || "").trim().slice(0, 160);
+  const email = String(values.email || "").trim().toLowerCase().slice(0, 320);
+  const subject = String(values.subject || "Website Contact").trim().slice(0, 240);
+  const message = String(values.message || "").trim().slice(0, 10000);
+  const formType = String(values.form_type || "contact").trim().toLowerCase().slice(0, 80) || "contact";
+  const pageUrl = String(values.page || "").trim().slice(0, 1000);
+  if (name.length < 2 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || message.length < 10) {
+    return json({ status: "error", message: "Please provide a valid name, email, subject, and message." }, 422, request, env);
+  }
+
+  const turnstileSecret = String(env.TURNSTILE_SECRET || "").trim();
+  const turnstileToken = String(values.cf_turnstile_response || "").trim();
+  if (turnstileSecret) {
+    if (!turnstileToken) return json({ status: "error", message: "CAPTCHA required." }, 400, request, env);
+    const verification = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ secret: turnstileSecret, response: turnstileToken, remoteip: request.headers.get("CF-Connecting-IP") || "" }),
+    }).then((response) => response.json()).catch(() => null);
+    if (!verification?.success) return json({ status: "error", message: "CAPTCHA verification failed." }, 403, request, env);
+  }
+
+  const id = crypto.randomUUID();
+  await env.DB.prepare(
+    `INSERT INTO site_submissions
+      (id, form_type, name, email, subject, message, page_url, source, status, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, 'website', 'new', datetime('now'), datetime('now'))`,
+  ).bind(id, formType, name, email, subject, message, pageUrl || null).run();
+
+  return json({ status: "success", ok: true, id, message: "Thank you! Your message has been received." }, 201, request, env);
+}
+
 async function handlePublicConfig(env, request) {
   const googleMapsApiKey = String(env.GOOGLE_MAPS_API_KEY || "").trim();
   const corsHeaders = buildCorsHeaders(request, env);
@@ -602,9 +712,8 @@ async function handlePublicConfig(env, request) {
 }
 
 async function handleAdminRegistrationStatusGet(request, env) {
-  if (!isAuthorizedForSettingsChange(request, env)) {
-    return new Response("Unauthorized", { status: 401 });
-  }
+  const context = await getAdminContext(request, env);
+  if (!context.ok) return adminError(context);
   const overview = await getRegistrationOverview(env, PADUCAH_GO_PROGRAM_ID);
   return json(
     {
@@ -612,6 +721,7 @@ async function handleAdminRegistrationStatusGet(request, env) {
       settings: overview.settings,
       activeDrafts: overview.activeDrafts,
       submittedCount: overview.submittedCount,
+      viewer: context.user,
     },
     200,
     request,
@@ -620,9 +730,8 @@ async function handleAdminRegistrationStatusGet(request, env) {
 }
 
 async function handleAdminRegistrationStatusUpdate(request, env) {
-  if (!isAuthorizedForSettingsChange(request, env)) {
-    return new Response("Unauthorized", { status: 401 });
-  }
+  const context = await getAdminContext(request, env);
+  if (!context.ok) return adminError(context);
   const payload = await request.json().catch(() => null);
   if (!payload || typeof payload !== "object") {
     return json({ ok: false, error: "Invalid JSON" }, 400, request, env);
@@ -635,7 +744,7 @@ async function handleAdminRegistrationStatusUpdate(request, env) {
       env,
     );
   }
-  const actorLabel = String(payload.actorLabel || "").trim() || "unknown admin";
+  const actorLabel = context.identity.email || String(payload.actorLabel || "").trim() || "unknown admin";
   try {
     const settings = await updateRegistrationSettings(
       env,
