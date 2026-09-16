@@ -44,6 +44,16 @@
 			"remote": true
 		}
 	],
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "lpaf-db",
+			// Placeholder until `wrangler d1 create lpaf-db` is run and authorized for remote use.
+			// Local development/testing works without a real database_id via `--local`.
+			"database_id": "00000000-0000-0000-0000-000000000000",
+			"migrations_dir": "mlsregistration/worker/migrations"
+		}
+	],
 	"vars": {
 		"PLAYER_SIGNATURE_PLACEMENT_MODE": "parent_guardian_only",
 		"ALLOWED_ORIGINS": "https://mlsregistration.lifeprepacademyfoundation.com,https://lifeprepacademyfoundation.com,https://www.lifeprepacademyfoundation.com,https://preview.lifeprepacademyfoundation.com,https://lpaf-mls.hligon.workers.dev,http://127.0.0.1:3000",

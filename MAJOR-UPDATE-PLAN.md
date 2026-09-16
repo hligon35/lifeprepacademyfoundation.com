@@ -143,27 +143,46 @@ becomes the fast operational/admin read path and sync-status tracker, not a repl
 3. **Phase 3 — Draft recovery.** Add localStorage/IndexedDB autosave + `registration_drafts` D1 table +
    online/offline/sync status UI + retry queue, layered onto the *existing* Apps Script resume-token
    system (does not replace it).
-4. **Phase 4 — D1.** Provision `lpaf-db`, write migrations for the schema above, wire idempotent writes
-   from the Worker.
+4. **Phase 4 — D1.** ✅ Schema delivered: 6 migrations under `mlsregistration/worker/migrations/`
+   (`0001_catalog_and_registrations.sql` … `0006_seed_data.sql`), `d1_databases` binding `lpaf-db`
+   added to `wrangler.jsonc` (placeholder `database_id` pending real provisioning — see §4.2), applied
+   and verified against the **local-only** D1 emulation (`wrangler d1 migrations apply lpaf-db --local`,
+   `wrangler d1 execute lpaf-db --local`). Remaining: wire idempotent Worker writes
+   (`INSERT ... ON CONFLICT (submission_id) DO UPDATE`) into `mlsregistration/worker/index.js`.
 5. **Phase 5 — Sheets mirroring status.** Add `sync_events`/sync-status columns and an admin retry
-   action; Apps Script contract unchanged.
+   action; Apps Script contract unchanged. (`sync_events` table already created in Phase 4 schema.)
 6. **Phase 6 — R2 `site-static` / `site-admin`.** Provision buckets, authorized admin asset endpoints;
    signed-agreement bucket untouched.
 7. **Phase 7 — Uniform inventory CSV import.** Wide-CSV parser, club-name canonicalization, preview →
-   commit → rollback, kit math (`min(jersey, shorts, socks)`).
-
-Phases 8+ referenced by the schema (admin UI, roles/permissions enforcement, newsletters, analytics
-dashboards, NFL Flag Football activation) were **not included in the supplied instructions** (the
-source text was cut off mid-Phase-7, inside an unterminated code block, with no Phase 8 heading). They
-are stubbed in the schema above but need their own phase write-up before implementation.
+   commit → rollback, kit math (`min(jersey, shorts, socks)`). (`uniform_inventory` /
+   `uniform_inventory_imports` tables already created in Phase 4 schema.)
+8. **Phase 8 — Roster Generator.** 5v5–11v11 formats, favorite-club preference balancing, manual
+   override, draft/published/locked workflow. (`roster_teams` / `roster_assignments` tables already
+   created in Phase 4 schema, including `favorite_club`/`preferred_uniform_club`/
+   `assigned_uniform_club`/`assigned_kit_id`/`league_team_id`/`manual_override`/`assignment_reason`
+   on `registration_participants`.)
+9. **Phase 9 — Admin Application.** Full nav shell (Paducah GO Soccer League / Paducah NFL Flag
+   Football [reserved] / Paducah NFL Flag Football Clinic [reserved] / Site Analytics / Newsletter /
+   Settings).
+10. **Phase 10 — Admin Permissions & Invitations.** Program-scoped RBAC enforcement in the Worker using
+    the `roles`/`permissions`/`admin_user_programs`/`admin_user_permissions` tables and seed data
+    already created in Phase 4 schema (7 suggested roles, 23 permissions incl. sensitive-field flags).
+11. **Phase 11 — Site Analytics.** Privacy-conscious event tracking/dashboards on top of the
+    `analytics_events` / `analytics_daily_metrics` tables already created in Phase 4 schema.
+12. **Phase 12 — Newsletter Builder.** Rich text + image-to-newsletter-body import using `site-admin`
+    as the private source, provider-neutral email delivery, on top of the `newsletters` /
+    `newsletter_assets` / `newsletter_recipients` tables already created in Phase 4 schema.
+13. **Phase 13 — Security/Privacy hardening pass** across all new surfaces built in Phases 2–12.
+14. **Phase 14 — Testing/QA.** Automated test suite + full production-style preview/inspection pass.
+15. **Phase 15 — Cloudflare configuration/documentation.** Final binding names, setup commands, secrets
+    guidance (no real secrets committed).
 
 ---
 
 ## 4. Open decisions before writing code (need your input)
 
-1. **Spec truncation:** the instructions you pasted end mid-Phase 7 (unclosed code fence, no Phase 8+).
-   Please resend/confirm the remaining phases (admin UI, roles/permissions, newsletters, analytics,
-   NFL Flag activation criteria) before I build the D1 schema areas that depend on them.
+1. ~~**Spec truncation**~~ — **Resolved.** Full spec (Phases 1–15 + Final Implementation Rules) received;
+   this document and the Phase 4 schema now cover all 15 phases.
 2. **Infra provisioning:** creating the `lpaf-db` D1 database and the `site-static` / `site-admin` R2
    buckets are real, billable Cloudflare account changes. I will run the `wrangler d1 create` /
    `wrangler r2 bucket create` commands (listed below) once you confirm — I won't create cloud
