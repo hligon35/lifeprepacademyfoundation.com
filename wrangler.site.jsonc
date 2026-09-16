@@ -1,0 +1,24 @@
+{
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "lifeprepacademyfoundation-site",
+	"compatibility_date": "2026-08-05",
+	"routes": [
+		{
+			"pattern": "lifeprepacademyfoundation.com/*",
+			"zone_name": "lifeprepacademyfoundation.com"
+		},
+		{
+			"pattern": "www.lifeprepacademyfoundation.com/*",
+			"zone_name": "lifeprepacademyfoundation.com"
+		}
+	],
+	"assets": {
+		"directory": "./",
+		"binding": "ASSETS",
+		"html_handling": "auto-trailing-slash",
+		"not_found_handling": "404-page"
+	},
+	"observability": {
+		"enabled": true
+	}
+}

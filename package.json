@@ -12,6 +12,8 @@
     "deploy:mlsregistration": "wrangler deploy --config wrangler.jsonc",
     "deploy:mlsregistration-preview": "wrangler deploy --config wrangler.preview.jsonc",
     "preview:mlsregistration": "wrangler dev --config wrangler.jsonc",
+    "deploy:site": "wrangler deploy --config wrangler.site.jsonc",
+    "preview:site": "wrangler dev --config wrangler.site.jsonc",
     "preview:player-pdf": "node mlsregistration/preview/live-pdf-preview.mjs",
     "preview:player-pdf:watch": "node mlsregistration/preview/live-pdf-preview.mjs --watch",
     "preview:volunteer-pdf": "node mlsregistration/preview/live-pdf-preview.mjs --volunteer",
