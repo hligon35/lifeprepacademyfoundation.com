@@ -44,6 +44,16 @@
 			"bucket_name": "lpaf-mls-signed-agreements-preview",
 			"binding": "lpaf_mls_signed_agreements_preview",
 			"remote": true
+		},
+		{
+			"binding": "SITE_STATIC",
+			"bucket_name": "site-static",
+			"remote": true
+		},
+		{
+			"binding": "SITE_ADMIN",
+			"bucket_name": "site-admin",
+			"remote": true
 		}
 	],
 	"d1_databases": [
