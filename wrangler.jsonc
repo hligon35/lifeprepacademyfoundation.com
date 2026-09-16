@@ -1,6 +1,6 @@
 {
 	"$schema": "node_modules/wrangler/config-schema.json",
-	"name": "lifeprepacademyfoundation-com",
+	"name": "mlsregistration-lifeprepacademyfoundation-com",
 	"main": "mlsregistration/worker/index.js",
 	"routes": [
 		{
