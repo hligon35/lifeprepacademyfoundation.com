@@ -7,6 +7,7 @@ Paducah GO is the first program workspace in the LifePrep Youth Programs platfor
 - Platform hub: https://app.lifeprepacademyfoundation.com/programs
 - Paducah GO: https://paducahgo.lifeprepacademyfoundation.com
 - Staff administration: https://lifeprepacademyfoundation.com/admin
+- Paducah GO operations console: https://paducahgo.lifeprepacademyfoundation.com/admin
 - Future program hosts: pnffl.lifeprepacademyfoundation.com and pnffc.lifeprepacademyfoundation.com
 
 ## Route groups
@@ -39,6 +40,8 @@ Role-scoped routes:
 - /program-admin/*
 
 The Paducah GO shell is responsive and uses a desktop sidebar plus mobile bottom navigation. Route access is enforced in the Worker and reflected in the client navigation.
+
+Phase One administration adds a D1-backed Paducah GO operations console with program-scoped registration controls, season configuration, registrant metrics and pipeline views, announcements with hero display, scoped staff assignments, and an activity log. The existing program-level registration gate remains the source of truth for public registration pages while season settings provide inputs for later team and schedule generation.
 
 ## Authentication
 
