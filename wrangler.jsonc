@@ -4,6 +4,10 @@
 	"main": "mlsregistration/worker/index.js",
 	"routes": [
 		{
+			"pattern": "mlsregistration.lifeprepacademyfoundation.com/*",
+			"zone_name": "lifeprepacademyfoundation.com"
+		},
+		{
 			"pattern": "paducahgo.lifeprepacademyfoundation.com/*",
 			"zone_name": "lifeprepacademyfoundation.com"
 		},

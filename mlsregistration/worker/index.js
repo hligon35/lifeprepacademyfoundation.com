@@ -54,6 +54,9 @@ const EMAIL_SIGNER_LINK_TTL_MS = 1000 * 60 * 60 * 24 * 30;
 const SIGNATURE_FONT_PATH = "/fonts/GreatVibes-Regular.ttf";
 const PRIMARY_APP_ORIGIN =
   "https://mlsregistration.lifeprepacademyfoundation.com";
+const LEGACY_REGISTRATION_HOST = "mlsregistration.lifeprepacademyfoundation.com";
+const CANONICAL_REGISTRATION_ORIGIN =
+  "https://paducahgo.lifeprepacademyfoundation.com";
 const DEFAULT_ALLOWED_ORIGINS = [
   PRIMARY_APP_ORIGIN,
   "https://lifeprepacademyfoundation.com",
@@ -158,6 +161,17 @@ function buildPlayerRegistrationPaymentUrl(options = {}) {
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
+
+    // Keep the legacy registration hostname available for APIs, documents, and
+    // agreement links, but move its public root to the canonical Paducah GO form.
+    if (
+      isLegacyRegistrationHost(url.hostname) &&
+      (url.pathname === "/" || url.pathname === "/index.html")
+    ) {
+      const target = new URL("/register", CANONICAL_REGISTRATION_ORIGIN);
+      target.search = url.search;
+      return Response.redirect(target.toString(), 301);
+    }
 
     if (isPgsHost(url.hostname)) {
       if (url.pathname === "/auth/handoff" && request.method === "GET") {
@@ -478,6 +492,10 @@ export default {
 
 function isPgsHost(hostname) {
   return String(hostname || "").toLowerCase() === "paducahgo.lifeprepacademyfoundation.com";
+}
+
+function isLegacyRegistrationHost(hostname) {
+  return String(hostname || "").toLowerCase() === LEGACY_REGISTRATION_HOST;
 }
 
 function isAppHost(hostname) {
