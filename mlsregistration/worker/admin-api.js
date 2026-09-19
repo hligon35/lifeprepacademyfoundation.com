@@ -2,6 +2,7 @@ import { adminError, getAdminContext, normalizeProgram } from "./admin-auth.js";
 import { getRegistrationOverview } from "./registration-status.js";
 import { handleOperationsApi } from "./operations-api.js";
 import { handleCommerceApi } from "./commerce-api.js";
+import { importSheetRegistrants, parseCsv } from "./registrant-import.js";
 
 
 const PROGRAM_MANAGER_ROLES = new Set(["super_admin", "program_administrator"]);
@@ -140,7 +141,7 @@ async function listRegistrants(request, env, context) {
   if (!programId || !canViewProgram(context, programId)) return denied();
   const status = text(url.searchParams.get("status"));
   const search = text(url.searchParams.get("search"));
-  const limit = Math.min(100, Math.max(1, Number(url.searchParams.get("limit") || 50)));
+  const limit = Math.min(500, Math.max(1, Number(url.searchParams.get("limit") || 100)));
   const values = [programId];
   const where = ["r.program_id = ?"];
   if (status && status !== "all") {
@@ -159,6 +160,32 @@ async function listRegistrants(request, env, context) {
     "SELECT status, COUNT(*) AS count FROM registrations WHERE program_id = ? GROUP BY status ORDER BY status",
   ).bind(programId).all();
   return json({ ok: true, registrants: rows.results || [], counts: counts.results || [], viewer: context.user });
+}
+
+async function importRegistrants(request, env, context) {
+  const payload = await request.json().catch(() => null);
+  const programId = text(payload?.programId);
+  if (!programId || !canManageRegistration(context, programId)) {
+    return denied("Registration import denied");
+  }
+  const rows = Array.isArray(payload?.rows)
+    ? payload.rows
+    : parseCsv(payload?.csv || "");
+  if (!rows.length) return json({ ok: false, error: "No CSV rows were found" }, 400);
+
+  const result = await importSheetRegistrants(env, {
+    programId,
+    seasonId: text(payload?.seasonId) || null,
+    rows,
+  });
+  await recordAudit(env, context, "registrants.imported", "registration_import", programId, programId, {
+    source: "google_sheets_csv",
+    imported: result.imported,
+    updated: result.updated,
+    skipped: result.skipped,
+    errors: result.errors.length,
+  });
+  return json({ ok: true, ...result });
 }
 
 async function listAnnouncements(request, env, context) {
@@ -725,6 +752,9 @@ async function handleAdminApi(request, env) {
     }
     if (path === "/api/admin/registrants" && request.method === "GET") {
       return listRegistrants(request, env, context);
+    }
+    if (path === "/api/admin/registrants/import" && request.method === "POST") {
+      return importRegistrants(request, env, context);
     }
     if (path === "/api/admin/announcements" && request.method === "GET") {
       return listAnnouncements(request, env, context);

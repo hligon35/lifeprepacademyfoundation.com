@@ -104,7 +104,16 @@ function normalizeRegistrationType(formType, values) {
   return REGISTRATION_TYPE_BY_FORM[formType] || "player";
 }
 
-export async function upsertRegistrationToD1(env, { formType, values }) {
+export async function upsertRegistrationToD1(
+  env,
+  {
+    formType,
+    values,
+    programId = PROGRAM_ID,
+    seasonId = null,
+    source = "worker",
+  },
+) {
   if (!env?.DB) throw new Error("D1 binding env.DB is not configured");
   const submissionId = first(values, "registration_submission_id", "submission_id");
   if (!submissionId) throw new Error("Missing registration submission ID");
@@ -114,20 +123,22 @@ export async function upsertRegistrationToD1(env, { formType, values }) {
   const participants = buildParticipants(formType, values, registrationId);
   const submitted = formType === "mls_registration" || bool(values?.submitted);
   const timestamp = now();
+  const submittedAt = first(values, "submitted_at", "submittedAt") || (submitted ? timestamp : null);
   const parentFirst = first(values, "parent_first_name", "first_name");
   const parentLast = first(values, "parent_last_name", "last_name");
   const parentEmail = first(values, "parent_email", "email").toLowerCase();
 
   await env.DB.prepare(`
     INSERT INTO registrations (
-      id, submission_id, program_id, registration_type, status,
+      id, submission_id, program_id, season_id, registration_type, status,
       parent_first_name, parent_last_name, parent_email, parent_phone,
       parent_street, parent_apt, parent_city, parent_state, parent_zip,
       emergency_first_name, emergency_last_name, emergency_relationship,
       emergency_email, emergency_phone, scholarship_requested, help_choice,
       raw_payload_json, source, created_at, updated_at, submitted_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(submission_id) DO UPDATE SET
+      season_id = COALESCE(excluded.season_id, registrations.season_id),
       registration_type = excluded.registration_type,
       status = CASE WHEN registrations.status = 'complete' THEN registrations.status ELSE excluded.status END,
       parent_first_name = excluded.parent_first_name,
@@ -147,12 +158,14 @@ export async function upsertRegistrationToD1(env, { formType, values }) {
       scholarship_requested = excluded.scholarship_requested,
       help_choice = excluded.help_choice,
       raw_payload_json = excluded.raw_payload_json,
+      source = excluded.source,
       updated_at = excluded.updated_at,
       submitted_at = COALESCE(registrations.submitted_at, excluded.submitted_at)
   `).bind(
     registrationId,
     submissionId,
-    PROGRAM_ID,
+    programId,
+    seasonId,
     registrationType,
     submitted ? "submitted" : "incomplete",
     parentFirst,
@@ -172,10 +185,10 @@ export async function upsertRegistrationToD1(env, { formType, values }) {
     bool(values?.scholarship_requested) ? 1 : 0,
     first(values, "help_choice"),
     json(values),
-    "worker",
+    source,
     timestamp,
     timestamp,
-    submitted ? timestamp : null,
+    submittedAt,
   ).run();
 
   for (const participant of participants) {

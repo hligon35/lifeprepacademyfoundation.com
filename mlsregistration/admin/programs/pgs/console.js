@@ -93,6 +93,12 @@
     roleIds().includes("program_administrator")
   );
 
+  const canManageRegistration = () => state.session && (
+    state.session.isSuperAdmin ||
+    roleIds().includes("program_administrator") ||
+    roleIds().includes("registration_manager")
+  );
+
   const canManageTeams = () => state.session && (
     state.session.isSuperAdmin ||
     roleIds().includes("program_administrator") ||
@@ -224,7 +230,7 @@
   async function loadRegistrants() {
     const status = $("#registrant-status") ? $("#registrant-status").value : "all";
     const search = $("#registrant-search") ? $("#registrant-search").value.trim() : "";
-    const payload = await api("/api/admin/registrants?programId=" + encodeURIComponent(PROGRAM_ID) + "&status=" + encodeURIComponent(status) + "&search=" + encodeURIComponent(search));
+    const payload = await api("/api/admin/registrants?programId=" + encodeURIComponent(PROGRAM_ID) + "&status=" + encodeURIComponent(status) + "&search=" + encodeURIComponent(search) + "&limit=500");
     state.registrants = payload.registrants || [];
     const list = $("#registrant-list");
     if (!list) return;
@@ -237,12 +243,42 @@
       "</tbody></table></div>";
   }
 
+  async function importRegistrantsCsv(file) {
+    if (!file) return;
+    const csv = await file.text();
+    if (!csv.trim()) {
+      showNotice("The selected CSV file is empty.");
+      return;
+    }
+    if (!window.confirm("Import the Players sheet into the selected season? Existing registrations with the same submission ID will be updated safely.")) return;
+    try {
+      const payload = await api("/api/admin/registrants/import", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          programId: PROGRAM_ID,
+          seasonId: state.seasonId || (currentSeason() && currentSeason().id) || null,
+          csv,
+        }),
+      });
+      const summary = "Imported " + (payload.imported || 0) + ", updated " + (payload.updated || 0) + ", skipped " + (payload.skipped || 0) + ".";
+      showNotice(payload.errors && payload.errors.length ? summary + " Some rows need review." : summary);
+      await loadWorkspace(true);
+    } catch (error) {
+      showNotice(error.message);
+    }
+  }
+
   async function renderRegistrants() {
     $("#view").innerHTML =
-      pageHead("People", "Registrants", "Review the registration pipeline for the selected Paducah GO program. Sensitive fields remain server-authorized and are not exposed to coaches or volunteers.", "") +
-      '<section class="card span-12"><div class="toolbar"><input class="form-control" id="registrant-search" placeholder="Search family or player"><select class="form-control" id="registrant-status"><option value="all">All statuses</option><option value="submitted">Submitted</option><option value="payment_pending">Payment pending</option><option value="complete">Complete</option><option value="withdrawn">Withdrawn</option></select>' +
-      button("Search", "search-registrants", "button-quiet") + "</div><div id=\"registrant-list\"><div class=\"loading\">Loading registrants…</div></div></section>";
+      pageHead("People", "Registrants", "Review the registration pipeline for the selected Paducah GO program. Sensitive fields remain server-authorized and are not exposed to coaches or volunteers.", canManageRegistration() ? button("Import Players CSV", "import-registrants", "button-gold") : "") +
+      '<section class="card span-12"><div class="toolbar"><input class="form-control" id="registrant-search" placeholder="Search family or player"><select class="form-control" id="registrant-status"><option value="all">All statuses</option><option value="submitted">Submitted</option><option value="agreement_pending">Agreement pending</option><option value="payment_pending">Payment pending</option><option value="complete">Complete</option><option value="withdrawn">Withdrawn</option></select>' +
+      button("Search", "search-registrants", "button-quiet") + (canManageRegistration() ? '<input id="registrant-import-file" type="file" accept=".csv,text/csv" hidden><span class="muted import-help">Export the Google Sheet Players tab as CSV, then import it here.</span>' : "") + "</div><div id=\"registrant-list\"><div class=\"loading\">Loading registrants…</div></div></section>";
     $("#search-registrants").onclick = () => loadRegistrants().catch((error) => showNotice(error.message));
+    if ($("#import-registrants")) {
+      $("#import-registrants").onclick = () => $("#registrant-import-file").click();
+      $("#registrant-import-file").onchange = (event) => importRegistrantsCsv(event.target.files && event.target.files[0]);
+    }
     await loadRegistrants();
   }
 
