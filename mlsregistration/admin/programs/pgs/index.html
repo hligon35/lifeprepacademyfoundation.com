@@ -1,45 +1,27 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Paducah GO Soccer</title>
-    <meta name="robots" content="noindex,nofollow" />
-    <link rel="stylesheet" href="/admin/admin.css?v=2026-09-16-1" />
-  </head>
-  <body class="pgs-shell">
-    <header class="pgs-header">
-      <a class="pgs-brand" href="https://lifeprepacademyfoundation.com/" aria-label="LifePrep Academy Foundation home">
-        <img src="https://mlsregistration.lifeprepacademyfoundation.com/LPAFxPGS.PNG" alt="Paducah GO Soccer" />
-        <span>Paducah GO Soccer</span>
-      </a>
-      <div class="pgs-greeting"><p class="eyebrow" style="color:#f9b515">Paducah GO Soccer League</p><h1 id="pgs-greeting">Welcome</h1></div>
-      <div class="pgs-account"><span id="pgs-status" class="status-pill status-pill--loading">Checking access</span><button id="pgs-logout" class="button" type="button">Log out</button></div>
-      <button class="pgs-profile" type="button" aria-label="Open profile">●</button>
-    </header>
-    <div class="pgs-body">
-      <aside class="pgs-drawer" aria-label="Paducah GO Soccer navigation">
-        <nav>
-          <a href="/" aria-current="page">Dashboard</a>
-          <a href="/schedule">Schedule</a>
-          <a href="/team-roster">Team roster</a>
-          <a href="/uniform-re-order">Uniform re-order</a>
-          <a href="/merch">Merch</a>
-          <a href="/contact">Contact</a>
-        </nav>
-      </aside>
-      <main class="pgs-content">
-        <div class="dashboard-card">
-          <p class="eyebrow" id="pgs-role-label">Player / Parent</p>
-          <h2>Paducah GO Soccer dashboard</h2>
-          <p id="pgs-dashboard-copy">Your registration status, team information, schedule, and program updates will appear here.</p>
-        </div>
-        <div class="metric-grid" style="margin-top:18px">
-          <article class="metric-card"><span>Participants</span><strong id="pgs-participants">—</strong></article>
-          <article class="metric-card"><span>Registration status</span><strong id="pgs-registration-status">—</strong></article>
-        </div>
-      </main>
-    </div>
-    <script src="/admin/programs/pgs/pgs.js?v=2026-09-16-1" defer></script>
-  </body>
-</html>
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="robots" content="noindex,nofollow">
+  <title>Paducah GO Soccer | LifePrep Youth Programs</title>
+  <link rel="stylesheet" href="/admin/programs/pgs/pgs.css?v=2026-09-19-1">
+</head>
+<body class="pgs-app">
+<header class="pgs-topbar">
+  <a class="brand" href="https://app.lifeprepacademyfoundation.com/programs">
+    <img src="/LPAFxPGS.PNG" alt="Paducah GO Soccer"><span><b>Paducah GO</b><small>LifePrep Youth Programs</small></span>
+  </a>
+  <div class="top-actions"><button id="notification-btn" aria-label="Notifications">⌁</button><button id="profile-btn" aria-label="Profile">?</button></div>
+</header>
+<div class="layout">
+  <aside class="sidebar">
+    <div class="program-meta"><small>Current program</small><b>Paducah GO Soccer</b><span>Upcoming season</span></div>
+    <nav id="side-nav" aria-label="Paducah GO navigation"></nav>
+    <div class="sidebar-foot"><a href="https://app.lifeprepacademyfoundation.com/programs">Switch program</a><a href="https://lifeprepacademyfoundation.com/">LifePrep website</a></div>
+  </aside>
+  <main class="main"><div id="crumbs" class="crumbs"></div><div id="view" aria-live="polite"><div class="loading">Loading Paducah GO...</div></div></main>
+</div>
+<nav id="mobile-nav" class="mobile-nav" aria-label="Mobile navigation"></nav>
+<div id="toast" class="toast" role="status"></div>
+<script src="/admin/programs/pgs/pgs.js?v=2026-09-19-1" defer></script>
+</body></html>
