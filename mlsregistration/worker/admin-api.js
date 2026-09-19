@@ -141,7 +141,7 @@ async function listRegistrants(request, env, context) {
   if (!programId || !canViewProgram(context, programId)) return denied();
   const status = text(url.searchParams.get("status"));
   const search = text(url.searchParams.get("search"));
-  const limit = Math.min(500, Math.max(1, Number(url.searchParams.get("limit") || 100)));
+  const limit = Math.min(5000, Math.max(1, Number(url.searchParams.get("limit") || 100)));
   const values = [programId];
   const where = ["r.program_id = ?"];
   if (status && status !== "all") {

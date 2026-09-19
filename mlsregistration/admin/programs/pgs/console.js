@@ -230,7 +230,7 @@
   async function loadRegistrants() {
     const status = $("#registrant-status") ? $("#registrant-status").value : "all";
     const search = $("#registrant-search") ? $("#registrant-search").value.trim() : "";
-    const payload = await api("/api/admin/registrants?programId=" + encodeURIComponent(PROGRAM_ID) + "&status=" + encodeURIComponent(status) + "&search=" + encodeURIComponent(search) + "&limit=500");
+    const payload = await api("/api/admin/registrants?programId=" + encodeURIComponent(PROGRAM_ID) + "&status=" + encodeURIComponent(status) + "&search=" + encodeURIComponent(search) + "&limit=5000");
     state.registrants = payload.registrants || [];
     const list = $("#registrant-list");
     if (!list) return;
