@@ -180,6 +180,9 @@ export default {
     if (url.pathname === "/api/public-config" && request.method === "GET") {
       return handlePublicConfig(env, request);
     }
+    if (url.pathname === "/api/public/program-announcements" && request.method === "GET") {
+      return handlePublicProgramAnnouncements(request, env);
+    }
     if (url.pathname === "/api/payment-session" && request.method === "GET") {
       return handlePaymentSession(request, env);
     }
@@ -959,6 +962,21 @@ async function handleAdminRegistrationStatusUpdate(request, env) {
       request,
       env,
     );
+  }
+}
+
+async function handlePublicProgramAnnouncements(request, env) {
+  const url = new URL(request.url);
+  const programId = url.searchParams.get("programId") || PADUCAH_GO_PROGRAM_ID;
+  if (!env?.DB) return json({ ok: true, announcements: [] }, 200, request, env);
+  try {
+    const result = await env.DB.prepare(
+      "SELECT id, program_id, title, body, priority, show_in_hero, published_at, created_at FROM announcements WHERE program_id = ? AND audience_type = 'program' AND status = 'published' AND (starts_at IS NULL OR starts_at <= datetime('now')) AND (expires_at IS NULL OR expires_at > datetime('now')) ORDER BY priority DESC, COALESCE(published_at, created_at) DESC LIMIT 10",
+    ).bind(programId).all();
+    return json({ ok: true, announcements: result.results || [] }, 200, request, env);
+  } catch (error) {
+    console.error("public-program-announcements-read-failed", error);
+    return json({ ok: true, announcements: [] }, 200, request, env);
   }
 }
 
