@@ -1,4 +1,4 @@
-import { adminError, getAdminContext } from "./admin-auth.js";
+import { adminError, getAdminContext, normalizeProgram } from "./admin-auth.js";
 import { getRegistrationOverview } from "./registration-status.js";
 import { handleOperationsApi } from "./operations-api.js";
 import { handleCommerceApi } from "./commerce-api.js";
@@ -473,7 +473,7 @@ async function listProgramCatalog(env, context) {
      FROM programs p LEFT JOIN program_settings ps ON ps.program_id = p.id ${where}
      ORDER BY p.display_order, CASE WHEN p.status = 'active' THEN 0 ELSE 1 END, p.name`,
   ).bind(...(context.isSuperAdmin ? [] : ids)).all();
-  return json({ ok: true, programs: result.results || [], isSuperAdmin: context.isSuperAdmin });
+  return json({ ok: true, programs: (result.results || []).map(normalizeProgram), isSuperAdmin: context.isSuperAdmin });
 }
 
 async function getOrganizationOverview(env, context) {
@@ -489,6 +489,7 @@ async function getOrganizationOverview(env, context) {
      ORDER BY p.display_order, p.name`,
   ).bind(...(context.isSuperAdmin ? [] : ids)).all();
   const programs = await Promise.all((catalog.results || []).map(async (program) => {
+    program = normalizeProgram(program);
     const [registrations, participants, teams, announcements, staff, orders] = await Promise.all([
       env.DB.prepare("SELECT COUNT(*) AS total, SUM(CASE WHEN status NOT IN ('incomplete', 'withdrawn') THEN 1 ELSE 0 END) AS submitted, SUM(CASE WHEN status = 'complete' THEN 1 ELSE 0 END) AS complete, SUM(CASE WHEN payment_status = 'paid' THEN 1 ELSE 0 END) AS paid FROM registrations WHERE program_id = ?").bind(program.id).first(),
       env.DB.prepare("SELECT COUNT(*) AS count FROM registration_participants p JOIN registrations r ON r.id = p.registration_id WHERE r.program_id = ? AND r.status != 'withdrawn'").bind(program.id).first(),

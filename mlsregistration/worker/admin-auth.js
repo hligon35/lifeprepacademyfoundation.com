@@ -1,7 +1,55 @@
 const jwksCache = new Map();
 
+const PROGRAM_METADATA_DEFAULTS = Object.freeze({
+  "paducah-go-soccer-league": {
+    slug: "paducah-go",
+    host: "paducahgo.lifeprepacademyfoundation.com",
+    description: "Paducah GO Soccer League operations, registration, teams, schedules, and merchandise.",
+    logo_url: "/PGSlogo.png",
+    display_order: 1,
+  },
+  "paducah-nfl-flag-football": {
+    slug: "pnffl",
+    host: "pnffl.lifeprepacademyfoundation.com",
+    description: "Paducah NFL Flag Football League foundation.",
+    logo_url: "/NFLFlagBlue.png",
+    display_order: 2,
+  },
+  "paducah-nfl-flag-football-clinic": {
+    slug: "pnffc",
+    host: "pnffc.lifeprepacademyfoundation.com",
+    description: "Paducah NFL Flag Football Clinic foundation.",
+    logo_url: "/pffLogo.png",
+    display_order: 3,
+  },
+});
+
 function text(value) {
   return value === undefined || value === null ? "" : String(value).trim();
+}
+
+function bootstrapEmails(value) {
+  return new Set(
+    text(value)
+      .split(/[;,\s]+/)
+      .map((email) => email.trim().toLowerCase())
+      .filter(Boolean),
+  );
+}
+
+function normalizeProgram(program) {
+  const defaults = PROGRAM_METADATA_DEFAULTS[program?.id];
+  if (!defaults) return program;
+  const metadataMissing = !program.slug && !program.host && !program.logo_url;
+  return {
+    ...program,
+    slug: program.slug || defaults.slug,
+    host: program.host || defaults.host,
+    description: program.description || defaults.description,
+    logo_url: program.logo_url || defaults.logo_url,
+    display_order: Number(program.display_order || 0) || defaults.display_order,
+    is_configured: Number(program.is_configured || 0) === 1 || metadataMissing ? 1 : 0,
+  };
 }
 
 function base64UrlToBytes(value) {
@@ -123,8 +171,7 @@ async function getAdminContext(request, env, options = {}) {
     "SELECT * FROM admin_users WHERE LOWER(email) = ? AND status = 'active' LIMIT 1",
   ).bind(identity.email).first();
 
-  const bootstrapEmail = text(env.ADMIN_BOOTSTRAP_EMAIL).toLowerCase();
-  const isBootstrapAdmin = bootstrapEmail && bootstrapEmail === identity.email;
+  const isBootstrapAdmin = bootstrapEmails(env.ADMIN_BOOTSTRAP_EMAIL).has(identity.email);
   if (!user && isBootstrapAdmin) {
     const userId = crypto.randomUUID();
     await env.DB.prepare(
@@ -164,6 +211,7 @@ async function getAdminContext(request, env, options = {}) {
          FROM programs p JOIN admin_user_programs aup ON aup.program_id = p.id
          WHERE aup.admin_user_id = ? ORDER BY p.display_order, p.name`,
   ).bind(...(isSuperAdmin ? [] : [user.id])).all();
+  programs = { results: (programs.results || []).map(normalizeProgram) };
 
   let assignments = [];
   try {
@@ -193,7 +241,7 @@ async function getAdminContext(request, env, options = {}) {
       const assignmentPrograms = await env.DB.prepare(
         "SELECT id, name, status, slug, host, description, logo_url, display_order, is_configured FROM programs WHERE id IN (" + placeholders + ") ORDER BY display_order, name",
       ).bind(...assignmentProgramIds).all();
-      (assignmentPrograms.results || []).forEach((program) => existingPrograms.set(program.id, program));
+      (assignmentPrograms.results || []).map(normalizeProgram).forEach((program) => existingPrograms.set(program.id, program));
       programs = { results: [...existingPrograms.values()] };
     } catch (error) {
       console.warn("assignment-programs-read-skipped", error);
@@ -219,4 +267,4 @@ function adminError(context) {
   });
 }
 
-export { adminError, getAdminContext, getAdminIdentity, verifyAccessJwt };
+export { adminError, getAdminContext, getAdminIdentity, normalizeProgram, verifyAccessJwt };
