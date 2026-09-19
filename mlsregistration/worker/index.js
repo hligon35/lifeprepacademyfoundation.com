@@ -28,6 +28,12 @@ import {
   updatePaymentInD1,
   upsertRegistrationToD1,
 } from "./d1-registration.js";
+import {
+  requestMagicLink,
+  verifyMagicLink,
+  createHandoffCode,
+  redeemHandoffCode,
+} from "./auth-magic-link.js";
 import { adminError, getAdminContext } from "./admin-auth.js";
 import { handleAdminApi } from "./admin-api.js";
 
@@ -359,6 +365,19 @@ export default {
       );
     }
 
+    if (url.pathname === "/api/auth/request-link" && request.method === "POST") {
+      return handleAuthRequestLink(request, env);
+    }
+    if (url.pathname === "/api/auth/verify" && request.method === "GET") {
+      return handleAuthVerify(request, env);
+    }
+    if (url.pathname === "/api/auth/handoff/create" && request.method === "POST") {
+      return handleAuthHandoffCreate(request, env);
+    }
+    if (url.pathname === "/api/auth/handoff/redeem" && request.method === "POST") {
+      return handleAuthHandoffRedeem(request, env);
+    }
+
     if (url.pathname.startsWith("/api/admin/")) {
       return handleAdminApi(request, env);
     }
@@ -404,11 +423,68 @@ export default {
 };
 
 function isPgsHost(hostname) {
-  return String(hostname || "").toLowerCase() === "pgs.lifeprepacademyfoundation.com";
+  return String(hostname || "").toLowerCase() === "paducahgo.lifeprepacademyfoundation.com";
 }
 
 function isAppHost(hostname) {
   return String(hostname || "").toLowerCase() === "app.lifeprepacademyfoundation.com";
+}
+
+async function handleAuthRequestLink(request, env) {
+  const url = new URL(request.url);
+  const body = await request.json().catch(() => ({}));
+  const result = await requestMagicLink(env, {
+    email: body?.email,
+    requestOrigin: url.origin,
+  });
+  return json(result, 200, request, env);
+}
+
+async function handleAuthVerify(request, env) {
+  const url = new URL(request.url);
+  const token = url.searchParams.get("token");
+  const result = await verifyMagicLink(env, { token, host: url.hostname });
+  if (!result.ok) return json(result, 401, request, env);
+
+  const headers = new Headers({ Location: "/" });
+  headers.append(
+    "Set-Cookie",
+    `session=${result.sessionToken}; Path=/; Secure; HttpOnly; SameSite=Lax; Expires=${new Date(result.expiresAt).toUTCString()}`,
+  );
+  return new Response(null, { status: 302, headers });
+}
+
+async function handleAuthHandoffCreate(request, env) {
+  const url = new URL(request.url);
+  const body = await request.json().catch(() => ({}));
+  const sessionToken = getCookie(request, "session");
+  const code = await createHandoffCode(env, {
+    sessionToken,
+    sourceHost: url.hostname,
+    targetHost: body?.targetHost,
+  });
+  if (!code) return json({ ok: false, error: "not_authenticated" }, 401, request, env);
+  return json({ ok: true, code }, 200, request, env);
+}
+
+async function handleAuthHandoffRedeem(request, env) {
+  const url = new URL(request.url);
+  const body = await request.json().catch(() => ({}));
+  const result = await redeemHandoffCode(env, { code: body?.code, targetHost: url.hostname });
+  if (!result.ok) return json(result, 401, request, env);
+
+  const headers = new Headers({ "Content-Type": "application/json", "Cache-Control": "no-store" });
+  headers.append(
+    "Set-Cookie",
+    `session=${result.sessionToken}; Path=/; Secure; HttpOnly; SameSite=Lax; Expires=${new Date(result.expiresAt).toUTCString()}`,
+  );
+  return new Response(JSON.stringify({ ok: true }), { status: 200, headers });
+}
+
+function getCookie(request, name) {
+  const header = request.headers.get("Cookie") || "";
+  const match = header.match(new RegExp(`(?:^|; )${name}=([^;]+)`));
+  return match ? decodeURIComponent(match[1]) : null;
 }
 
 function handleAdminAssetPage(request, env, assetPath, role = "") {

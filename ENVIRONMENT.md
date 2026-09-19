@@ -24,8 +24,8 @@ For local Wrangler-only testing, use `ADMIN_DEV_EMAIL` and `ADMIN_DEV_TOKEN` in
 
 The admin route is served by the registration Worker at `/admin`, while the root
 website continues to serve its public pages. The route patterns for `/admin*`,
-`/api/admin*`, and `pgs.lifeprepacademyfoundation.com/*` require active, proxied
-DNS records in the Cloudflare zone.
+`/api/admin*`, and `paducahgo.lifeprepacademyfoundation.com/*` (the Paducah GO
+dashboard host) require active, proxied DNS records in the Cloudflare zone.
 
 Current Worker secrets should be configured separately for each environment:
 
@@ -58,10 +58,12 @@ wrangler secret put NEWSLETTER_PROVIDER_API_KEY
 wrangler secret put NEWSLETTER_WEBHOOK_SECRET
 ```
 
-If Worker-owned email delivery is enabled, configure SendGrid separately:
+If Worker-owned email delivery is enabled, Resend is used first for outbound email;
+Cloudflare Email Sending (the `send_email` binding) is the fallback, and is also used
+directly for inter-system messaging and inbound auto-replies:
 
 ```bash
-wrangler secret put SENDGRID_API_KEY
+wrangler secret put RESEND_API_KEY
 ```
 
 If the public contact form uses Turnstile, configure its server secret separately:
@@ -70,8 +72,7 @@ If the public contact form uses Turnstile, configure its server secret separatel
 wrangler secret put TURNSTILE_SECRET
 ```
 
-Set the verified sender address with the non-secret `SENDGRID_FROM_EMAIL` and
-`SENDGRID_FROM_NAME` variables.
+Set the verified sender address with the non-secret `RESEND_FROM_EMAIL` variable.
 
 Use separate preview and production secrets. Never print or commit secret
 values. Preserve the existing signed-agreement bucket and Durable Object
