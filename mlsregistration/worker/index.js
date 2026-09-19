@@ -183,6 +183,9 @@ export default {
     if (url.pathname === "/api/public/program-announcements" && request.method === "GET") {
       return handlePublicProgramAnnouncements(request, env);
     }
+    if (url.pathname === "/api/public/program-schedule" && request.method === "GET") {
+      return handlePublicProgramSchedule(request, env);
+    }
     if (url.pathname === "/api/payment-session" && request.method === "GET") {
       return handlePaymentSession(request, env);
     }
@@ -977,6 +980,25 @@ async function handlePublicProgramAnnouncements(request, env) {
   } catch (error) {
     console.error("public-program-announcements-read-failed", error);
     return json({ ok: true, announcements: [] }, 200, request, env);
+  }
+}
+
+async function handlePublicProgramSchedule(request, env) {
+  const url = new URL(request.url);
+  const programId = url.searchParams.get("programId") || PADUCAH_GO_PROGRAM_ID;
+  if (!env?.DB) return json({ ok: true, version: null, games: [] }, 200, request, env);
+  try {
+    const version = await env.DB.prepare(
+      "SELECT id, season_id, games_per_team, published_at FROM schedule_versions WHERE program_id = ? AND status = 'published' ORDER BY published_at DESC, created_at DESC LIMIT 1",
+    ).bind(programId).first();
+    if (!version) return json({ ok: true, version: null, games: [] }, 200, request, env);
+    const games = await env.DB.prepare(
+      "SELECT sg.id, sg.round_number, sg.starts_at, sg.field_name, sg.status, home.name AS home_team_name, away.name AS away_team_name, gr.home_score, gr.away_score FROM schedule_games sg JOIN roster_teams home ON home.id = sg.home_team_id JOIN roster_teams away ON away.id = sg.away_team_id LEFT JOIN game_results gr ON gr.game_id = sg.id WHERE sg.version_id = ? ORDER BY sg.round_number, sg.starts_at, home.name",
+    ).bind(version.id).all();
+    return json({ ok: true, version, games: games.results || [] }, 200, request, env);
+  } catch (error) {
+    console.error("public-program-schedule-read-failed", error);
+    return json({ ok: true, version: null, games: [] }, 200, request, env);
   }
 }
 

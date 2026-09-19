@@ -88,6 +88,10 @@
     canManageTeams() || roleIds().includes("coach") || roleIds().includes("volunteer")
   );
 
+  const canRecordResults = () => state.session && (
+    canManageTeams() || roleIds().includes("coach")
+  );
+
   const pageHead = (eyebrow, title, description, action) =>
     '<div class="page-head"><div><p class="eyebrow">' + esc(eyebrow) + "</p><h1>" +
     esc(title) + "</h1><p>" + esc(description) + "</p></div>" + (action || "") + "</div>";
@@ -509,7 +513,7 @@
       '<div class="table-wrap"><table class="data-table"><thead><tr><th>Round</th><th>Matchup</th><th>Start</th><th>Field</th><th>Result</th></tr></thead><tbody>' +
       payload.games.map((game) => '<tr><td>' + esc(game.round_number) + '</td><td><strong>' + esc(game.home_team_name) + "</strong> vs " + esc(game.away_team_name) + '</td><td>' + esc(formatDate(game.starts_at)) + '</td><td>' + esc(game.field_name || "—") + '</td><td>' +
         (game.home_score !== null && game.home_score !== undefined ? esc(game.home_score + " – " + game.away_score) : "") +
-        (canOperateTeam() ? '<div class="result-entry"><input class="form-control" data-home-score="' + esc(game.id) + '" type="number" min="0" placeholder="H"><input class="form-control" data-away-score="' + esc(game.id) + '" type="number" min="0" placeholder="A"><button class="button button-quiet" data-game-result="' + esc(game.id) + '" data-version-id="' + esc(versionId) + '" type="button">Save</button></div>' : "") +
+        (canRecordResults() ? '<div class="result-entry"><input class="form-control" data-home-score="' + esc(game.id) + '" type="number" min="0" placeholder="H"><input class="form-control" data-away-score="' + esc(game.id) + '" type="number" min="0" placeholder="A"><button class="button button-quiet" data-game-result="' + esc(game.id) + '" data-version-id="' + esc(versionId) + '" type="button">Save</button></div>' : "") +
       "</td></tr>").join("") + "</tbody></table></div>";
     document.querySelectorAll("[data-game-result]").forEach((item) => {
       item.onclick = async () => {
