@@ -1,5 +1,6 @@
 import { adminError, getAdminContext } from "./admin-auth.js";
 import { getRegistrationOverview } from "./registration-status.js";
+import { handleOperationsApi } from "./operations-api.js";
 
 
 const PROGRAM_MANAGER_ROLES = new Set(["super_admin", "program_administrator"]);
@@ -486,6 +487,15 @@ async function handleAdminApi(request, env) {
     }
     if (path === "/api/admin/programs" && request.method === "GET") {
       return json({ ok: true, programs: context.programs, isSuperAdmin: context.isSuperAdmin });
+    }
+    if (
+      path === "/api/admin/operations" ||
+      path.startsWith("/api/admin/rosters") ||
+      path.startsWith("/api/admin/schedules") ||
+      path.startsWith("/api/admin/attendance") ||
+      path.startsWith("/api/admin/volunteer-duties")
+    ) {
+      return handleOperationsApi(request, env, context);
     }
     if (path === "/api/admin/program-workspace" && request.method === "GET") {
       return getProgramWorkspace(request, env, context);
