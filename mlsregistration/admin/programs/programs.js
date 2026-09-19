@@ -30,7 +30,7 @@
         window.location.href = target + "/auth/handoff?code=" + encodeURIComponent(payload.code) + "&returnTo=%2Fadmin";
       } catch (error) {
         link.removeAttribute("aria-busy");
-        window.location.href = target;
+        window.location.href = target + "/admin";
       }
     });
   });
