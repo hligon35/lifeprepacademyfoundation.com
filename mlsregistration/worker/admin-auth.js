@@ -159,10 +159,10 @@ async function getAdminContext(request, env, options = {}) {
   const isSuperAdmin = Boolean(isBootstrapAdmin) || (roles.results || []).some((role) => role.id === "super_admin");
   let programs = await env.DB.prepare(
     isSuperAdmin
-      ? "SELECT id, name, status FROM programs ORDER BY CASE WHEN status = 'active' THEN 0 ELSE 1 END, name"
-      : `SELECT DISTINCT p.id, p.name, p.status
+      ? "SELECT id, name, status, slug, host, description, logo_url, display_order, is_configured FROM programs ORDER BY display_order, CASE WHEN status = 'active' THEN 0 ELSE 1 END, name"
+      : `SELECT DISTINCT p.id, p.name, p.status, p.slug, p.host, p.description, p.logo_url, p.display_order, p.is_configured
          FROM programs p JOIN admin_user_programs aup ON aup.program_id = p.id
-         WHERE aup.admin_user_id = ? ORDER BY p.name`,
+         WHERE aup.admin_user_id = ? ORDER BY p.display_order, p.name`,
   ).bind(...(isSuperAdmin ? [] : [user.id])).all();
 
   let assignments = [];
@@ -191,7 +191,7 @@ async function getAdminContext(request, env, options = {}) {
     try {
       const placeholders = assignmentProgramIds.map(() => "?").join(", ");
       const assignmentPrograms = await env.DB.prepare(
-        "SELECT id, name, status FROM programs WHERE id IN (" + placeholders + ") ORDER BY name",
+        "SELECT id, name, status, slug, host, description, logo_url, display_order, is_configured FROM programs WHERE id IN (" + placeholders + ") ORDER BY display_order, name",
       ).bind(...assignmentProgramIds).all();
       (assignmentPrograms.results || []).forEach((program) => existingPrograms.set(program.id, program));
       programs = { results: [...existingPrograms.values()] };

@@ -459,6 +459,215 @@ async function getProgramOverview(env, context, programId) {
   });
 }
 
+function accessibleProgramIds(context) {
+  return [...new Set((context.programs || []).map((program) => program.id).filter(Boolean))];
+}
+
+async function listProgramCatalog(env, context) {
+  const ids = accessibleProgramIds(context);
+  if (!context.isSuperAdmin && !ids.length) return json({ ok: true, programs: [], isSuperAdmin: false });
+  const where = context.isSuperAdmin ? "" : "WHERE p.id IN (" + ids.map(() => "?").join(",") + ")";
+  const result = await env.DB.prepare(
+    `SELECT p.id, p.name, p.status, p.slug, p.host, p.description, p.logo_url, p.display_order, p.is_configured,
+            ps.public_enabled, ps.registration_enabled, ps.contact_email, ps.support_phone, ps.features_json
+     FROM programs p LEFT JOIN program_settings ps ON ps.program_id = p.id ${where}
+     ORDER BY p.display_order, CASE WHEN p.status = 'active' THEN 0 ELSE 1 END, p.name`,
+  ).bind(...(context.isSuperAdmin ? [] : ids)).all();
+  return json({ ok: true, programs: result.results || [], isSuperAdmin: context.isSuperAdmin });
+}
+
+async function getOrganizationOverview(env, context) {
+  const ids = accessibleProgramIds(context);
+  if (!context.isSuperAdmin && !ids.length) return json({ ok: true, programs: [], totals: {} });
+  const where = context.isSuperAdmin ? "" : "WHERE p.id IN (" + ids.map(() => "?").join(",") + ")";
+  const catalog = await env.DB.prepare(
+    `SELECT p.id, p.name, p.status, p.slug, p.host, p.description, p.logo_url, p.display_order, p.is_configured,
+            COALESCE(ps.public_enabled, 0) AS public_enabled,
+            COALESCE(ps.registration_enabled, 0) AS registration_enabled,
+            ps.contact_email, ps.support_phone, ps.features_json
+     FROM programs p LEFT JOIN program_settings ps ON ps.program_id = p.id ${where}
+     ORDER BY p.display_order, p.name`,
+  ).bind(...(context.isSuperAdmin ? [] : ids)).all();
+  const programs = await Promise.all((catalog.results || []).map(async (program) => {
+    const [registrations, participants, teams, announcements, staff, orders] = await Promise.all([
+      env.DB.prepare("SELECT COUNT(*) AS total, SUM(CASE WHEN status NOT IN ('incomplete', 'withdrawn') THEN 1 ELSE 0 END) AS submitted, SUM(CASE WHEN status = 'complete' THEN 1 ELSE 0 END) AS complete, SUM(CASE WHEN payment_status = 'paid' THEN 1 ELSE 0 END) AS paid FROM registrations WHERE program_id = ?").bind(program.id).first(),
+      env.DB.prepare("SELECT COUNT(*) AS count FROM registration_participants p JOIN registrations r ON r.id = p.registration_id WHERE r.program_id = ? AND r.status != 'withdrawn'").bind(program.id).first(),
+      env.DB.prepare("SELECT COUNT(*) AS count FROM roster_teams WHERE program_id = ? AND status != 'archived'").bind(program.id).first(),
+      env.DB.prepare("SELECT COUNT(*) AS count FROM announcements WHERE program_id = ? AND status IN ('published', 'scheduled')").bind(program.id).first(),
+      env.DB.prepare("SELECT COUNT(*) AS count FROM admin_assignments WHERE program_id = ? AND status = 'active'").bind(program.id).first(),
+      env.DB.prepare("SELECT COUNT(*) AS total, SUM(CASE WHEN status = 'paid' THEN 1 ELSE 0 END) AS paid, COALESCE(SUM(CASE WHEN status = 'paid' THEN total_cents ELSE 0 END), 0) AS paid_cents FROM orders WHERE program_id = ?").bind(program.id).first(),
+    ]);
+    return {
+      ...program,
+      metrics: {
+        registrations: Number(registrations?.total || 0),
+        submitted: Number(registrations?.submitted || 0),
+        complete: Number(registrations?.complete || 0),
+        paidRegistrations: Number(registrations?.paid || 0),
+        participants: Number(participants?.count || 0),
+        teams: Number(teams?.count || 0),
+        activeAnnouncements: Number(announcements?.count || 0),
+        staffAssignments: Number(staff?.count || 0),
+        orders: Number(orders?.total || 0),
+        paidOrders: Number(orders?.paid || 0),
+        paidOrderCents: Number(orders?.paid_cents || 0),
+      },
+    };
+  }));
+  const totals = programs.reduce((summary, program) => {
+    Object.keys(program.metrics).forEach((key) => { summary[key] = (summary[key] || 0) + program.metrics[key]; });
+    return summary;
+  }, {});
+  return json({ ok: true, programs, totals, isSuperAdmin: context.isSuperAdmin });
+}
+
+async function updateProgram(request, env, context, programId) {
+  const current = await env.DB.prepare("SELECT * FROM programs WHERE id = ? LIMIT 1").bind(programId).first();
+  if (!current) return json({ ok: false, error: "Program not found" }, 404);
+  if (!canManageProgram(context, programId)) return denied("Program management denied");
+  const payload = await request.json().catch(() => null);
+  const coreFields = [];
+  const coreValues = [];
+  const addCore = (column, value) => { if (value !== undefined) { coreFields.push(column + " = ?"); coreValues.push(value); } };
+  if (context.isSuperAdmin) {
+    addCore("name", text(payload?.name).slice(0, 160) || current.name);
+    addCore("status", ["active", "inactive", "hidden"].includes(text(payload?.status)) ? text(payload.status) : current.status);
+    addCore("slug", text(payload?.slug).slice(0, 80).toLowerCase().replace(/[^a-z0-9-]/g, "-") || current.slug);
+    addCore("host", text(payload?.host).slice(0, 255).toLowerCase() || current.host);
+    addCore("display_order", Math.max(0, Math.floor(Number(payload?.displayOrder ?? current.display_order ?? 0))));
+    addCore("is_configured", payload?.isConfigured === undefined ? current.is_configured : (payload.isConfigured ? 1 : 0));
+  }
+  addCore("description", payload?.description === undefined ? current.description : text(payload.description).slice(0, 1000));
+  addCore("logo_url", payload?.logoUrl === undefined ? current.logo_url : text(payload.logoUrl).slice(0, 500));
+  if (coreFields.length) {
+    coreFields.push("updated_at = datetime('now')");
+    await env.DB.prepare("UPDATE programs SET " + coreFields.join(", ") + " WHERE id = ?").bind(...coreValues, programId).run();
+  }
+  const settings = await env.DB.prepare("SELECT * FROM program_settings WHERE program_id = ? LIMIT 1").bind(programId).first();
+  const settingsPayload = payload?.settings || payload || {};
+  const settingKeys = ["publicEnabled", "registrationEnabled", "contactEmail", "supportPhone", "features"];
+  const hasSettingChange = Boolean(payload?.settings) || settingKeys.some((key) => Object.prototype.hasOwnProperty.call(settingsPayload, key));
+  let settingSummary = {};
+  if (hasSettingChange || !settings) {
+    const settingValues = [
+      settingsPayload.publicEnabled === undefined ? Number(settings?.public_enabled || 0) : (settingsPayload.publicEnabled ? 1 : 0),
+      settingsPayload.registrationEnabled === undefined ? Number(settings?.registration_enabled || 0) : (settingsPayload.registrationEnabled ? 1 : 0),
+      settingsPayload.contactEmail === undefined ? (settings?.contact_email || null) : (text(settingsPayload.contactEmail) || null),
+      settingsPayload.supportPhone === undefined ? (settings?.support_phone || null) : (text(settingsPayload.supportPhone) || null),
+      settingsPayload.features === undefined ? (settings?.features_json || "{}") : JSON.stringify(settingsPayload.features || {}),
+      context.user.id,
+    ];
+    await env.DB.prepare(
+      `INSERT INTO program_settings (program_id, public_enabled, registration_enabled, contact_email, support_phone, features_json, created_by, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))
+       ON CONFLICT(program_id) DO UPDATE SET public_enabled = excluded.public_enabled,
+         registration_enabled = excluded.registration_enabled, contact_email = excluded.contact_email,
+         support_phone = excluded.support_phone, features_json = excluded.features_json, updated_at = datetime('now')`,
+    ).bind(programId, ...settingValues).run();
+    settingSummary = { publicEnabled: settingValues[0], registrationEnabled: settingValues[1] };
+  }
+  await recordAudit(env, context, "program.updated", "program", programId, programId, { status: payload?.status, ...settingSummary });
+  return listProgramCatalog(env, context);
+}
+
+async function listSeasonTemplates(request, env, context) {
+  const url = new URL(request.url);
+  const requestedProgram = text(url.searchParams.get("programId"));
+  if (requestedProgram && !canViewProgram(context, requestedProgram)) return denied();
+  const values = [];
+  let where = "status = 'active'";
+  if (requestedProgram) {
+    where += " AND (program_id = ? OR program_id IS NULL)";
+    values.push(requestedProgram);
+  } else if (!context.isSuperAdmin) {
+    const ids = accessibleProgramIds(context);
+    if (!ids.length) return json({ ok: true, templates: [] });
+    where += " AND (program_id IS NULL OR program_id IN (" + ids.map(() => "?").join(",") + "))";
+    values.push(...ids);
+  }
+  const result = await env.DB.prepare(
+    "SELECT st.*, p.name AS program_name FROM season_templates st LEFT JOIN programs p ON p.id = st.program_id WHERE " + where + " ORDER BY CASE WHEN st.program_id IS NULL THEN 0 ELSE 1 END, st.name",
+  ).bind(...values).all();
+  return json({ ok: true, templates: result.results || [] });
+}
+
+function templatePayload(payload, current = {}) {
+  const name = text(payload?.name || current.name).slice(0, 160);
+  if (!name) return { error: "Template name is required" };
+  const registrationMode = ["inherit", "open", "closed", "waitlist"].includes(text(payload?.registrationMode || current.registration_mode)) ? text(payload?.registrationMode || current.registration_mode) : "inherit";
+  let settings = {};
+  try {
+    settings = payload?.settings ?? (current.settings_json ? JSON.parse(current.settings_json) : {});
+  } catch (error) {
+    return { error: "Template settings must be valid JSON" };
+  }
+  return {
+    name,
+    description: text(payload?.description ?? current.description).slice(0, 1000) || null,
+    sport: text(payload?.sport ?? current.sport).slice(0, 80) || null,
+    leagueFormat: text(payload?.leagueFormat || current.league_format) || "7v7",
+    targetTeamSize: Math.min(30, Math.max(2, Number(payload?.targetTeamSize ?? current.target_team_size ?? 10))),
+    targetGamesPerTeam: Math.min(40, Math.max(1, Number(payload?.targetGamesPerTeam ?? current.target_games_per_team ?? 8))),
+    registrationMode,
+    registrationCapacity: Number(payload?.registrationCapacity ?? current.registration_capacity) || null,
+    settingsJson: JSON.stringify(settings && typeof settings === "object" ? settings : {}),
+  };
+}
+
+async function createSeasonTemplate(request, env, context) {
+  const payload = await request.json().catch(() => null);
+  const programId = text(payload?.programId) || null;
+  if (programId ? !canManageProgram(context, programId) : !context.isSuperAdmin) return denied("Season template management denied");
+  const normalized = templatePayload(payload);
+  if (normalized.error) return json({ ok: false, error: normalized.error }, 400);
+  const id = text(payload?.id).replace(/[^a-z0-9-]/gi, "-").replace(/-+/g, "-").replace(/^-|-$/g, "").toLowerCase() || crypto.randomUUID();
+  try {
+    await env.DB.prepare(
+      "INSERT INTO season_templates (id, program_id, name, description, sport, league_format, target_team_size, target_games_per_team, registration_mode, registration_capacity, settings_json, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+    ).bind(id, programId, normalized.name, normalized.description, normalized.sport, normalized.leagueFormat, normalized.targetTeamSize, normalized.targetGamesPerTeam, normalized.registrationMode, normalized.registrationCapacity, normalized.settingsJson, context.user.id).run();
+  } catch (error) {
+    return json({ ok: false, error: String(error?.message || error) }, 400);
+  }
+  await recordAudit(env, context, "season_template.created", "season_template", id, programId, { name: normalized.name });
+  return json({ ok: true, template: await env.DB.prepare("SELECT * FROM season_templates WHERE id = ?").bind(id).first() }, 201);
+}
+
+async function updateSeasonTemplate(request, env, context, id) {
+  const current = await env.DB.prepare("SELECT * FROM season_templates WHERE id = ? LIMIT 1").bind(id).first();
+  if (!current) return json({ ok: false, error: "Season template not found" }, 404);
+  if (current.program_id ? !canManageProgram(context, current.program_id) : !context.isSuperAdmin) return denied("Season template management denied");
+  const payload = await request.json().catch(() => null);
+  const normalized = templatePayload(payload, current);
+  if (normalized.error) return json({ ok: false, error: normalized.error }, 400);
+  const status = ["active", "archived"].includes(text(payload?.status)) ? text(payload.status) : current.status;
+  await env.DB.prepare(
+    "UPDATE season_templates SET name = ?, description = ?, sport = ?, league_format = ?, target_team_size = ?, target_games_per_team = ?, registration_mode = ?, registration_capacity = ?, settings_json = ?, status = ?, updated_at = datetime('now') WHERE id = ?",
+  ).bind(normalized.name, normalized.description, normalized.sport, normalized.leagueFormat, normalized.targetTeamSize, normalized.targetGamesPerTeam, normalized.registrationMode, normalized.registrationCapacity, normalized.settingsJson, status, id).run();
+  await recordAudit(env, context, "season_template.updated", "season_template", id, current.program_id, { status });
+  return json({ ok: true, template: await env.DB.prepare("SELECT * FROM season_templates WHERE id = ?").bind(id).first() });
+}
+
+async function createSeasonFromTemplate(request, env, context) {
+  const payload = await request.json().catch(() => null);
+  const programId = text(payload?.programId);
+  const templateId = text(payload?.templateId);
+  if (!programId || !templateId || !canManageProgram(context, programId)) return denied("Season management denied");
+  const template = await env.DB.prepare("SELECT * FROM season_templates WHERE id = ? AND status = 'active' LIMIT 1").bind(templateId).first();
+  if (!template || (template.program_id && template.program_id !== programId)) return json({ ok: false, error: "Template is not available for this program" }, 400);
+  const name = text(payload?.name).slice(0, 120);
+  if (!name) return json({ ok: false, error: "Season name is required" }, 400);
+  const id = text(payload?.id).replace(/[^a-z0-9-]/gi, "-").replace(/-+/g, "-").replace(/^-|-$/g, "").toLowerCase() || crypto.randomUUID();
+  const status = ["upcoming", "active", "closed", "archived"].includes(text(payload?.status)) ? text(payload.status) : "upcoming";
+  try {
+    await env.DB.prepare("INSERT INTO seasons (id, program_id, name, status, starts_on, ends_on) VALUES (?, ?, ?, ?, ?, ?)").bind(id, programId, name, status, text(payload?.startsOn) || null, text(payload?.endsOn) || null).run();
+    await env.DB.prepare("INSERT INTO season_settings (season_id, program_id, registration_mode, registration_capacity, target_team_size, target_games_per_team) VALUES (?, ?, ?, ?, ?, ?)").bind(id, programId, text(payload?.registrationMode) || template.registration_mode, Number(payload?.registrationCapacity ?? template.registration_capacity) || null, Number(payload?.targetTeamSize || template.target_team_size || 10), Number(payload?.targetGamesPerTeam || template.target_games_per_team || 8)).run();
+  } catch (error) {
+    return json({ ok: false, error: String(error?.message || error) }, 400);
+  }
+  await recordAudit(env, context, "season.created_from_template", "season", id, programId, { templateId, name, status });
+  return json({ ok: true, season: await env.DB.prepare("SELECT * FROM seasons WHERE id = ?").bind(id).first(), templateId }, 201);
+}
+
 async function handleAdminApi(request, env) {
   const context = await getAdminContext(request, env);
   if (!context.ok) return adminError(context);
@@ -486,8 +695,17 @@ async function handleAdminApi(request, env) {
     if (path === "/api/admin/analytics/overview" && request.method === "GET") {
       return getAnalytics(env);
     }
+    if (path === "/api/admin/organization/overview" && request.method === "GET") {
+      return getOrganizationOverview(env, context);
+    }
+    if (path === "/api/admin/program-catalog" && request.method === "GET") {
+      return listProgramCatalog(env, context);
+    }
     if (path === "/api/admin/programs" && request.method === "GET") {
-      return json({ ok: true, programs: context.programs, isSuperAdmin: context.isSuperAdmin });
+      return listProgramCatalog(env, context);
+    }
+    if (path.startsWith("/api/admin/programs/") && request.method === "PATCH") {
+      return updateProgram(request, env, context, decodeURIComponent(path.split("/").pop()));
     }
     if (
       path === "/api/admin/operations" ||
@@ -519,8 +737,20 @@ async function handleAdminApi(request, env) {
     if (path === "/api/admin/seasons" && request.method === "POST") {
       return createSeason(request, env, context);
     }
+    if (path === "/api/admin/seasons/from-template" && request.method === "POST") {
+      return createSeasonFromTemplate(request, env, context);
+    }
     if (path.startsWith("/api/admin/seasons/") && request.method === "PATCH") {
       return updateSeason(request, env, context, decodeURIComponent(path.split("/").pop()));
+    }
+    if (path === "/api/admin/season-templates" && request.method === "GET") {
+      return listSeasonTemplates(request, env, context);
+    }
+    if (path === "/api/admin/season-templates" && request.method === "POST") {
+      return createSeasonTemplate(request, env, context);
+    }
+    if (path.startsWith("/api/admin/season-templates/") && request.method === "PATCH") {
+      return updateSeasonTemplate(request, env, context, decodeURIComponent(path.split("/").pop()));
     }
     if (path === "/api/admin/staff/assignments" && request.method === "GET") {
       return listStaffAssignments(request, env, context);
@@ -543,4 +773,3 @@ async function handleAdminApi(request, env) {
     return json({ ok: false, error: "Admin request failed" }, 500);
   }
 }
-

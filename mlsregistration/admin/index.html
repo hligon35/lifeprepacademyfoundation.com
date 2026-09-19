@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>LifePrep Academy Foundation Admin</title>
     <meta name="robots" content="noindex,nofollow" />
-    <link rel="stylesheet" href="/admin/admin.css?v=2026-09-19-4" />
+    <link rel="stylesheet" href="/admin/admin.css?v=2026-09-19-5" />
   </head>
   <body class="admin-body">
     <div class="admin-app">
@@ -45,6 +45,15 @@
           <article class="metric-card metric-card--accent"><span>Unread submissions</span><strong id="metric-unread">—</strong></article>
         </section>
 
+        <section class="organization-card" aria-labelledby="organization-heading">
+          <div class="section-heading">
+            <div><p class="eyebrow">Multi-program operations</p><h2 id="organization-heading">Organization overview</h2></div>
+            <button id="refresh-organization" class="button button--quiet" type="button">Refresh</button>
+          </div>
+          <p id="org-overview-message" class="inline-message" role="status">Loading program roll-up…</p>
+          <div id="org-overview-grid" class="organization-grid"></div>
+        </section>
+
         <section class="inbox-card" aria-labelledby="inbox-heading">
           <div class="section-heading">
             <div><p class="eyebrow">Inbox</p><h2 id="inbox-heading">Website submissions</h2></div>
@@ -70,6 +79,6 @@
         <a class="button button--primary" id="access-login-link" href="/admin">Continue to secure login</a>
       </section>
     </div>
-    <script src="/admin/admin.js?v=2026-09-19-4" defer></script>
+    <script src="/admin/admin.js?v=2026-09-19-5" defer></script>
   </body>
 </html>

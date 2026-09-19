@@ -14,6 +14,7 @@
     assignments: [],
     directory: [],
     activity: [],
+    templates: [],
     products: [],
     orders: [],
     view: "dashboard",
@@ -245,16 +246,52 @@
     await loadRegistrants();
   }
 
-  function renderSeasons() {
+  async function loadSeasonTemplates() {
+    const payload = await api("/api/admin/season-templates?programId=" + encodeURIComponent(PROGRAM_ID));
+    state.templates = payload.templates || [];
+  }
+
+  async function renderSeasons() {
+    await loadSeasonTemplates();
     const season = currentSeason();
     const settings = state.workspace.seasonSettings || {};
+    const templates = state.templates;
+    const templateList = templates.length
+      ? '<div class="template-list">' + templates.map((template) => '<article class="template-card"><div><strong>' + esc(template.name) + '</strong><span>' + esc(template.program_name || "Organization-wide") + '</span></div><p>' + esc(template.description || "Reusable season configuration") + '</p><div class="template-meta">' + esc(template.sport || "Sport") + ' · ' + esc(template.league_format) + ' · ' + esc(template.target_team_size) + ' players/team · ' + esc(template.target_games_per_team) + ' games/team</div></article>').join('') + '</div>'
+      : empty("No season templates", "Save a season configuration to reuse it across future seasons.");
     $("#view").innerHTML =
       pageHead("Configuration", "Seasons", "Create and configure seasons without changing the existing public registration workflow.", canManageProgram() ? button("Create season", "create-season", "button-gold") : "") +
       '<div class="grid">' +
         '<section class="card span-6"><h2>Selected season</h2>' + (season ? '<div class="activity-list"><div class="activity"><strong>' + esc(season.name) + '</strong><div class="activity-meta">' + esc(season.status) + " · " + esc(formatDay(season.starts_on)) + " – " + esc(formatDay(season.ends_on)) + "</div></div><div class=\"activity\"><strong>Team placement target</strong><div class=\"activity-meta\">" + esc(settings.target_team_size || 10) + " players per team</div></div><div class=\"activity\"><strong>Games per team</strong><div class=\"activity-meta\">" + esc(settings.target_games_per_team || 8) + " scheduled games</div></div></div>" : empty("No season selected", "Create a season to establish the operating configuration.")) + "</section>" +
         '<section class="card span-6"><h2>Season rules</h2><p>These settings become inputs for the Phase Two team and schedule tools.</p><div class="activity-list"><div class="activity"><strong>Registration mode</strong><div class="activity-meta">' + esc(settings.registration_mode || "inherit") + "</div></div><div class=\"activity\"><strong>Team generation</strong><div class=\"activity-meta\">" + esc(settings.generation_status || "not_started") + "</div></div></div></section>" +
-      "</div>";
+      "</div>" +
+      '<section class="card template-section"><div class="section-head"><div><h2>Reusable season templates</h2><p>Templates keep Paducah GO consistent and establish a pattern the other LPAF programs can reuse.</p></div></div>' + templateList +
+      (canManageProgram() ? '<div class="template-actions"><form id="template-form" class="form-grid"><div class="field"><label for="template-name">Save current season as template</label><input class="form-control" id="template-name" required placeholder="Paducah GO Spring 7v7"></div><div class="field"><label for="template-sport">Sport</label><input class="form-control" id="template-sport" value="soccer"></div><div class="field full"><label for="template-description">Description</label><textarea class="form-control" id="template-description" rows="2" placeholder="What this season setup is for"></textarea></div><div class="field full"><div class="actions">' + button("Save template", "save-template", "button-gold") + '</div></div></form>' +
+      (templates.length ? '<form id="template-season-form" class="form-grid"><div class="field full"><label for="template-select">Create season from template</label><select class="form-control" id="template-select">' + templates.map((template) => '<option value="' + esc(template.id) + '">' + esc(template.name) + '</option>').join('') + '</select></div><div class="field"><label for="template-season-name">New season name</label><input class="form-control" id="template-season-name" required placeholder="2027 Spring Season"></div><div class="field"><label for="template-season-status">Status</label><select class="form-control" id="template-season-status"><option value="upcoming">Upcoming</option><option value="active">Active</option></select></div><div class="field"><label for="template-season-start">Starts</label><input class="form-control" id="template-season-start" type="date"></div><div class="field"><label for="template-season-end">Ends</label><input class="form-control" id="template-season-end" type="date"></div><div class="field full"><div class="actions">' + button("Create from template", "create-from-template", "button-quiet") + '</div></div></form>' : '') + '</div>' : '') + '</section>';
     $("#create-season") && ($("#create-season").onclick = showSeasonForm);
+    $("#template-form") && ($("#template-form").onsubmit = async (event) => {
+      event.preventDefault();
+      try {
+        await api("/api/admin/season-templates", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({
+          programId: PROGRAM_ID, name: $("#template-name").value, sport: $("#template-sport").value, description: $("#template-description").value,
+          leagueFormat: "7v7", targetTeamSize: Number(settings.target_team_size || 10), targetGamesPerTeam: Number(settings.target_games_per_team || 8), registrationMode: settings.registration_mode || "inherit"
+        })});
+        showNotice("Season template saved.");
+        await renderSeasons();
+      } catch (error) { showNotice(error.message); }
+    });
+    $("#template-season-form") && ($("#template-season-form").onsubmit = async (event) => {
+      event.preventDefault();
+      try {
+        const payload = await api("/api/admin/seasons/from-template", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({
+          programId: PROGRAM_ID, templateId: $("#template-select").value, name: $("#template-season-name").value, status: $("#template-season-status").value,
+          startsOn: $("#template-season-start").value, endsOn: $("#template-season-end").value
+        })});
+        showNotice("Season created from template.");
+        state.seasonId = payload.season?.id || state.seasonId;
+        await loadWorkspace(false);
+      } catch (error) { showNotice(error.message); }
+    });
   }
 
   function showSeasonForm() {

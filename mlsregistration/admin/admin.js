@@ -127,6 +127,42 @@
     if (response.ok && payload?.ok) renderMetrics(payload.metrics);
   }
 
+  function renderOrganizationOverview(payload) {
+    const grid = $("#org-overview-grid");
+    const message = $("#org-overview-message");
+    if (!grid || !message) return;
+    const programs = payload.programs || [];
+    if (!programs.length) {
+      message.textContent = "No program access has been assigned to this account.";
+      grid.innerHTML = `<div class="empty-state"><p>Ask a super admin to assign a program role.</p></div>`;
+      return;
+    }
+    const totals = payload.totals || {};
+    message.textContent = `${programs.length} accessible program${programs.length === 1 ? "" : "s"} · ${totals.registrations || 0} registration records · ${totals.teams || 0} teams`;
+    grid.innerHTML = programs.map((program) => {
+      const metrics = program.metrics || {};
+      const state = program.status === "active" ? "Active" : program.status === "hidden" ? "Hidden" : "Inactive";
+      return `<article class="organization-program">
+        <div class="organization-program__head"><div><p class="eyebrow">${escapeHtml(program.slug || "program")}</p><h3>${escapeHtml(program.name)}</h3></div><span class="status-pill status-pill--${program.status === "active" ? "active" : "loading"}">${state}</span></div>
+        <p class="organization-program__host">${escapeHtml(program.host || "Host not configured")}</p>
+        <div class="organization-program__metrics"><span><strong>${metrics.registrations || 0}</strong> registrations</span><span><strong>${metrics.participants || 0}</strong> players</span><span><strong>${metrics.teams || 0}</strong> teams</span><span><strong>${metrics.orders || 0}</strong> orders</span></div>
+        <div class="organization-program__footer"><span>${metrics.activeAnnouncements || 0} active announcements</span><span>${metrics.paidOrderCents ? `$${(metrics.paidOrderCents / 100).toFixed(2)} paid merch` : "No paid merch"}</span></div>
+      </article>`;
+    }).join("");
+  }
+
+  async function loadOrganizationOverview() {
+    const message = $("#org-overview-message");
+    if (message) message.textContent = "Loading program roll-up…";
+    const response = await api("/api/admin/organization/overview");
+    const payload = await response.json().catch(() => null);
+    if (!response.ok || !payload?.ok) {
+      if (message) message.textContent = payload?.error || "Unable to load the organization overview.";
+      return;
+    }
+    renderOrganizationOverview(payload);
+  }
+
   function escapeHtml(value) {
     return String(value ?? "").replace(/[&<>'"]/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" }[character]));
   }
@@ -134,7 +170,8 @@
   $("#logout-button")?.addEventListener("click", () => {
     window.location.href = `/cdn-cgi/access/logout?returnTo=${encodeURIComponent(`${window.location.origin}${dashboardPath}`)}`;
   });
-  $("#refresh-inbox")?.addEventListener("click", () => Promise.all([loadInbox(), loadAnalytics()]));
+  $("#refresh-inbox")?.addEventListener("click", () => Promise.all([loadInbox(), loadAnalytics(), loadOrganizationOverview()]));
+  $("#refresh-organization")?.addEventListener("click", loadOrganizationOverview);
   document.querySelectorAll("[data-filter]").forEach((chip) => chip.addEventListener("click", () => {
     state.filter = chip.dataset.filter;
     document.querySelectorAll("[data-filter]").forEach((item) => item.classList.toggle("is-active", item === chip));
@@ -145,5 +182,6 @@
     if (!authenticated) return;
     loadInbox();
     loadAnalytics();
+    loadOrganizationOverview();
   }).catch(() => setAccessRequired("The secure admin service is unavailable. Try again after Cloudflare Access is configured."));
 })();

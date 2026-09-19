@@ -37,6 +37,17 @@ h2 { margin-bottom: 0; font-size: 1.45rem; }
 .metric-card span { color: var(--muted); font-size: .88rem; }
 .metric-card strong { color: var(--purple); font-size: 2rem; }
 .metric-card--accent { border-top: 4px solid var(--gold); }
+.organization-card { margin-bottom: 22px; padding: clamp(18px, 3vw, 32px); background: var(--surface); border: 1px solid var(--line); border-radius: 18px; }
+.organization-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+.organization-program { padding: 18px; border: 1px solid var(--line); border-radius: 14px; background: #fcfcfe; }
+.organization-program__head, .organization-program__footer { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.organization-program h3 { margin: 0; font-size: 1.05rem; }
+.organization-program .eyebrow { margin-bottom: 4px; font-size: .68rem; }
+.organization-program__host { margin: 8px 0 16px; color: var(--muted); font-size: .82rem; overflow-wrap: anywhere; }
+.organization-program__metrics { display: grid; grid-template-columns: repeat(2, 1fr); gap: 9px; margin-bottom: 15px; }
+.organization-program__metrics span, .organization-program__footer { color: var(--muted); font-size: .82rem; }
+.organization-program__metrics strong { display: block; color: var(--purple); font-size: 1.35rem; }
+.organization-program__footer { padding-top: 12px; border-top: 1px solid var(--line); }
 .inbox-card { padding: clamp(18px, 3vw, 32px); background: var(--surface); border: 1px solid var(--line); border-radius: 18px; }
 .filter-chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 24px 0 8px; }
 .filter-chip { border: 1px solid var(--line); border-radius: 999px; padding: 8px 13px; color: var(--muted); background: white; cursor: pointer; }
@@ -72,6 +83,11 @@ h2 { margin-bottom: 0; font-size: 1.45rem; }
   .program-card--pgs, .program-card--pnffl, .program-card--pnffc { background: transparent; box-shadow: none; border: 0; }
 .program-card img { width: min(220px, 80%); height: 112px; object-fit: contain; }
 .program-card h2 { max-width: 260px; font-size: 1.08rem; }
+.program-card__status { color: var(--muted); font-size: .8rem; font-weight: 700; }
+.program-card__open { color: var(--purple); font-size: .82rem; font-weight: 800; text-decoration: underline; text-underline-offset: 3px; }
+.program-card__open.is-disabled { color: var(--muted); text-decoration: none; }
+.program-card__controls { display: grid; gap: 6px; width: 100%; padding: 10px; color: var(--muted); background: rgba(255,255,255,.82); border: 1px solid var(--line); border-radius: 10px; font-size: .75rem; text-align: left; }
+.program-card__controls select { margin-left: 4px; padding: 3px 5px; border: 1px solid var(--line); border-radius: 6px; background: white; }
 .program-card--wide { grid-column: 1 / -1; }
 .program-note { color: var(--muted); }
 .pgs-shell { min-height: 100vh; background: linear-gradient(135deg, #faf8ff, #f4f7fb); }
@@ -91,5 +107,6 @@ h2 { margin-bottom: 0; font-size: 1.45rem; }
 .pgs-content { width: min(1000px, 100%); padding: 54px clamp(22px, 5vw, 70px); }
 .pgs-content .dashboard-card { padding: 26px; background: white; border: 1px solid var(--line); border-radius: 18px; }
 .pgs-content .dashboard-card p { color: var(--muted); line-height: 1.65; }
+@media (max-width: 900px) { .organization-grid { grid-template-columns: 1fr; } }
 @media (max-width: 780px) { .metric-grid { grid-template-columns: repeat(2, 1fr); } .page-heading, .section-heading { align-items: flex-start; flex-direction: column; } .submission-row { grid-template-columns: 1fr; } .submission-message { grid-column: auto; } .program-grid { grid-template-columns: 1fr; } .program-card--wide { grid-column: auto; } .pgs-greeting { position: static; order: 3; width: 100%; text-align: left; } .pgs-header { flex-wrap: wrap; padding-left: 24px; } .pgs-body { display: block; } .pgs-drawer { width: 100%; border-right: 0; border-bottom: 1px solid var(--line); padding: 12px; } .pgs-drawer nav { display: flex; overflow-x: auto; } .pgs-drawer a { white-space: nowrap; } }
 @media (max-width: 520px) { .admin-topbar { align-items: flex-start; flex-direction: column; } .admin-account { width: 100%; justify-content: space-between; } .metric-grid { grid-template-columns: 1fr; } .admin-brand span { font-size: .9rem; } }
