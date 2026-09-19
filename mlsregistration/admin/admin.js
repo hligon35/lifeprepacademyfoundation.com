@@ -2,6 +2,13 @@
   const state = { filter: "all" };
   const api = (path, options = {}) => fetch(path, { credentials: "include", ...options });
   const $ = (selector) => document.querySelector(selector);
+  const isAppHost = location.hostname === "app.lifeprepacademyfoundation.com";
+  const dashboardPath = isAppHost ? "/dashboard" : "/admin";
+  const programsPath = isAppHost ? "/programs" : "/admin/programs";
+
+  document.getElementById("admin-brand-link")?.setAttribute("href", dashboardPath);
+  document.getElementById("open-programs-link")?.setAttribute("href", programsPath);
+  document.getElementById("access-login-link")?.setAttribute("href", dashboardPath);
 
   function setAccessStatus(text, tone) {
     const el = $("#admin-status");
@@ -87,7 +94,7 @@
   }
 
   $("#logout-button")?.addEventListener("click", () => {
-    window.location.href = `/cdn-cgi/access/logout?returnTo=${encodeURIComponent(`${window.location.origin}/admin`)}`;
+    window.location.href = `/cdn-cgi/access/logout?returnTo=${encodeURIComponent(`${window.location.origin}${dashboardPath}`)}`;
   });
   $("#refresh-inbox")?.addEventListener("click", () => Promise.all([loadInbox(), loadAnalytics()]));
   document.querySelectorAll("[data-filter]").forEach((chip) => chip.addEventListener("click", () => {

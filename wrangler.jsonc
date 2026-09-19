@@ -26,18 +26,27 @@
 		{
 			"pattern": "pgs.lifeprepacademyfoundation.com/*",
 			"zone_name": "lifeprepacademyfoundation.com"
+		},
+		{
+			"pattern": "app.lifeprepacademyfoundation.com/*",
+			"zone_name": "lifeprepacademyfoundation.com"
 		}
 	],
 	"compatibility_date": "2026-08-05",
 	"assets": {
 		"directory": "./mlsregistration",
 		"binding": "ASSETS",
+		"html_handling": "none",
 		"run_worker_first": [
 			"/api/*",
 			"/",
 			"/index.html",
 			"/admin",
-			"/admin/*"
+			"/admin/*",
+			"/dashboard",
+			"/dashboard/*",
+			"/programs",
+			"/programs/*"
 		]
 	},
 	"durable_objects": {
@@ -87,9 +96,9 @@
 		}
 	],
 	"vars": {
-		"ADMIN_BOOTSTRAP_EMAIL": "",
-		"CF_ACCESS_TEAM_DOMAIN": "",
-		"CF_ACCESS_AUD": "",
+		"ADMIN_BOOTSTRAP_EMAIL": "bhall1911@gmail.com, hligon@getsparqd.com, hligon35@gmail.com, bhall@getsparqd.com",
+		"CF_ACCESS_TEAM_DOMAIN": "lpaf.cloudflareaccess.com",
+		"CF_ACCESS_AUD": "7191b9a45738684873941579d5ea04385b476cb5204ce813ab91f2b47cf2b181",
 		"PLAYER_SIGNATURE_PLACEMENT_MODE": "parent_guardian_only",
 		"ALLOWED_ORIGINS": "https://paducahgo.lifeprepacademyfoundation.com,https://pgs.lifeprepacademyfoundation.com,https://programs.lifeprepacademyfoundation.com,https://mlsregistration.lifeprepacademyfoundation.com,https://lifeprepacademyfoundation.com,https://www.lifeprepacademyfoundation.com,https://preview.lifeprepacademyfoundation.com,http://127.0.0.1:3000",
 		"E_CONSENT_TEXT_VERSION": "v1-2026-08-06",

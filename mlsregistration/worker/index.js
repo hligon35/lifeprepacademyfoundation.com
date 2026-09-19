@@ -18,6 +18,7 @@ import {
   registrationClosedPayload,
   getRegistrationOverview,
   updateRegistrationSettings,
+  isAuthorizedForSettingsChange,
 } from "./registration-status.js";
 import {
   findPaymentRegistrationInD1,
@@ -386,6 +387,15 @@ export default {
       return handleAdminAssetPage(request, env, "/admin/programs/pgs/index.html");
     }
 
+    if (isAppHost(url.hostname)) {
+      if (url.pathname === "/" || url.pathname === "/dashboard" || url.pathname === "/dashboard/") {
+        return handleAdminAssetPage(request, env, "/admin/index.html");
+      }
+      if (url.pathname === "/programs" || url.pathname === "/programs/") {
+        return handleAdminAssetPage(request, env, "/admin/programs/index.html");
+      }
+    }
+
     return env.ASSETS.fetch(request);
   },
   async email(message, env, ctx) {
@@ -395,6 +405,10 @@ export default {
 
 function isPgsHost(hostname) {
   return String(hostname || "").toLowerCase() === "pgs.lifeprepacademyfoundation.com";
+}
+
+function isAppHost(hostname) {
+  return String(hostname || "").toLowerCase() === "app.lifeprepacademyfoundation.com";
 }
 
 function handleAdminAssetPage(request, env, assetPath, role = "") {
@@ -712,8 +726,10 @@ async function handlePublicConfig(env, request) {
 }
 
 async function handleAdminRegistrationStatusGet(request, env) {
-  const context = await getAdminContext(request, env);
-  if (!context.ok) return adminError(context);
+  if (!isAuthorizedForSettingsChange(request, env)) {
+    const context = await getAdminContext(request, env);
+    if (!context.ok) return adminError(context);
+  }
   const overview = await getRegistrationOverview(env, PADUCAH_GO_PROGRAM_ID);
   return json(
     {
@@ -721,7 +737,6 @@ async function handleAdminRegistrationStatusGet(request, env) {
       settings: overview.settings,
       activeDrafts: overview.activeDrafts,
       submittedCount: overview.submittedCount,
-      viewer: context.user,
     },
     200,
     request,
@@ -730,8 +745,12 @@ async function handleAdminRegistrationStatusGet(request, env) {
 }
 
 async function handleAdminRegistrationStatusUpdate(request, env) {
-  const context = await getAdminContext(request, env);
-  if (!context.ok) return adminError(context);
+  let actorLabel = "unknown admin";
+  if (!isAuthorizedForSettingsChange(request, env)) {
+    const context = await getAdminContext(request, env);
+    if (!context.ok) return adminError(context);
+    actorLabel = context.identity.email || actorLabel;
+  }
   const payload = await request.json().catch(() => null);
   if (!payload || typeof payload !== "object") {
     return json({ ok: false, error: "Invalid JSON" }, 400, request, env);
@@ -744,7 +763,7 @@ async function handleAdminRegistrationStatusUpdate(request, env) {
       env,
     );
   }
-  const actorLabel = context.identity.email || String(payload.actorLabel || "").trim() || "unknown admin";
+  actorLabel = String(payload.actorLabel || "").trim() || actorLabel;
   try {
     const settings = await updateRegistrationSettings(
       env,

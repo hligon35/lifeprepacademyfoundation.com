@@ -63,13 +63,10 @@ h2 { margin-bottom: 0; font-size: 1.45rem; }
 .program-grid { display: grid; grid-template-columns: repeat(2, minmax(240px, 1fr)); gap: clamp(30px, 7vw, 80px); justify-items: center; margin-top: 42px; }
 .program-card { width: min(330px, 100%); min-height: 250px; padding: 24px; border: 0; background: transparent; border-radius: 24px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; text-decoration: none; box-shadow: 0 18px 35px rgba(23,32,51,.12); transition: transform .24s ease, filter .24s ease; }
 .program-card:hover, .program-card:focus-visible { transform: translateY(-7px); filter: drop-shadow(0 16px 18px rgba(40,17,86,.18)); outline: none; }
-.program-card--pgs { background: #fff4dc; }
-.program-card--pnffl { background: #e8efff; }
-.program-card--pnffc { background: #f2eafa; }
+  .program-card--pgs, .program-card--pnffl, .program-card--pnffc { background: transparent; box-shadow: none; border: 0; }
 .program-card img { width: min(220px, 80%); height: 112px; object-fit: contain; }
 .program-card h2 { max-width: 260px; font-size: 1.08rem; }
 .program-card--wide { grid-column: 1 / -1; }
-.program-card--wide img { width: min(300px, 86%); }
 .program-note { color: var(--muted); }
 .pgs-shell { min-height: 100vh; background: linear-gradient(135deg, #faf8ff, #f4f7fb); }
 .pgs-header { position: relative; min-height: 160px; padding: 18px 28px 46px 90px; color: white; background: linear-gradient(120deg, #281156, #59318d); display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; }
