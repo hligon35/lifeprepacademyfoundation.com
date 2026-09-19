@@ -161,7 +161,7 @@ export default {
       }
       // The Paducah GO hostname is a route-driven application shell. Static assets
       // continue through ASSETS; every application path resolves to the shell.
-      if (!url.pathname.startsWith("/api/") && !/\\.[a-z0-9]+$/i.test(url.pathname)) {
+      if (!url.pathname.startsWith("/api/") && !/\.[a-z0-9]+$/i.test(url.pathname)) {
         return handleAdminAssetPage(request, env, "/admin/programs/pgs/index.html");
       }
     }
