@@ -165,12 +165,33 @@ async function getAdminContext(request, env, options = {}) {
          WHERE aup.admin_user_id = ? ORDER BY p.name`,
   ).bind(...(isSuperAdmin ? [] : [user.id])).all();
 
+  let assignments = [];
+  try {
+    const assignmentRows = await env.DB.prepare(
+      `SELECT aa.id, aa.program_id, aa.season_id, aa.team_id, aa.role_id,
+              aa.scope_type, aa.status, aa.expires_at,
+              r.name AS role_name, s.name AS season_name
+       FROM admin_assignments aa
+       JOIN roles r ON r.id = aa.role_id
+       LEFT JOIN seasons s ON s.id = aa.season_id
+       WHERE aa.admin_user_id = ? AND aa.status = 'active'
+         AND (aa.expires_at IS NULL OR aa.expires_at >= datetime('now'))
+       ORDER BY aa.program_id, aa.scope_type, aa.created_at`,
+    ).bind(user.id).all();
+    assignments = assignmentRows.results || [];
+  } catch (error) {
+    // The assignment table is introduced by the Phase One migration. Keep the
+    // existing admin session usable while an older preview database is migrating.
+    console.warn("admin-assignments-read-skipped", error);
+  }
+
   return {
     ok: true,
     via: authentication.via,
     identity,
     user: { id: user.id, email: user.email, displayName: user.display_name, status: user.status },
     roles: roles.results || [],
+    assignments,
     isSuperAdmin,
     programs: programs.results || [],
   };
