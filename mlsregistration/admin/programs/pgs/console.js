@@ -638,6 +638,10 @@
     if (state.view === "registrants") return renderRegistrants();
     if (state.view === "seasons") return renderSeasons();
     if (state.view === "announcements") return renderAnnouncements();
+    if (state.view === "rosters") return renderRosters();
+    if (state.view === "schedules") return renderSchedules();
+    if (state.view === "attendance") return renderAttendance();
+    if (state.view === "duties") return renderDuties();
     if (state.view === "staff") return renderStaff();
     if (state.view === "activity") return renderActivity();
     state.view = "dashboard";
@@ -656,6 +660,7 @@
     if (refreshAnnouncements !== false) {
       await loadAnnouncements().catch(() => {});
     }
+    await loadOperations().catch(() => { state.operations = { teams: [], schedules: [], duties: [] }; });
     await renderView();
   }
 
@@ -693,8 +698,8 @@
     $("#access-required").hidden = true;
     const pathView = location.pathname.split("/").filter(Boolean).pop();
     const hashView = location.hash.replace("#", "");
-    if (["dashboard", "registration", "registrants", "seasons", "announcements", "staff", "activity"].includes(hashView)) state.view = hashView;
-    else if (["registration", "registrants", "seasons", "announcements", "staff", "activity"].includes(pathView)) state.view = pathView;
+    if (["dashboard", "registration", "registrants", "seasons", "announcements", "rosters", "schedules", "attendance", "duties", "staff", "activity"].includes(hashView)) state.view = hashView;
+    else if (["registration", "registrants", "seasons", "announcements", "rosters", "schedules", "attendance", "duties", "staff", "activity"].includes(pathView)) state.view = pathView;
     document.querySelectorAll("[data-view]").forEach((item) => {
       item.addEventListener("click", () => setView(item.dataset.view, true));
     });
