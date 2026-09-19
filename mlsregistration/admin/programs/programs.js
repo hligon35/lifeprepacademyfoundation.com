@@ -13,4 +13,25 @@
   }).catch(() => { window.location.href = dashboardPath; });
   document.getElementById("admin-brand-link")?.setAttribute("href", dashboardPath);
   $("#logout-button")?.addEventListener("click", () => { window.location.href = `/cdn-cgi/access/logout?returnTo=${encodeURIComponent(`${window.location.origin}${dashboardPath}`)}`; });
+  document.querySelectorAll("[data-program-target]").forEach((link) => {
+    link.addEventListener("click", async (event) => {
+      event.preventDefault();
+      const target = link.getAttribute("data-program-target");
+      link.setAttribute("aria-busy", "true");
+      try {
+        const response = await fetch("/api/auth/access-exchange", {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json", Accept: "application/json" },
+          body: JSON.stringify({ targetHost: new URL(target).hostname }),
+        });
+        const payload = await response.json().catch(() => null);
+        if (!response.ok || !payload?.code) throw new Error(payload?.error || "handoff_failed");
+        window.location.href = target + "/auth/handoff?code=" + encodeURIComponent(payload.code) + "&returnTo=%2Fdashboard";
+      } catch (error) {
+        link.removeAttribute("aria-busy");
+        window.location.href = target;
+      }
+    });
+  });
 })();
