@@ -6,6 +6,10 @@
   const state = {
     session: null,
     workspace: null,
+    operations: null,
+    rosters: [],
+    schedules: [],
+    attendance: null,
     announcements: [],
     assignments: [],
     directory: [],
@@ -72,6 +76,16 @@
   const canManageProgram = () => state.session && (
     state.session.isSuperAdmin ||
     roleIds().includes("program_administrator")
+  );
+
+  const canManageTeams = () => state.session && (
+    state.session.isSuperAdmin ||
+    roleIds().includes("program_administrator") ||
+    roleIds().includes("roster_manager")
+  );
+
+  const canOperateTeam = () => state.session && (
+    canManageTeams() || roleIds().includes("coach") || roleIds().includes("volunteer")
   );
 
   const pageHead = (eyebrow, title, description, action) =>
