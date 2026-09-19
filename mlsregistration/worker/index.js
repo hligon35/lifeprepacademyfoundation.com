@@ -509,6 +509,9 @@ async function handleAuthAccessExchange(request, env) {
     user = await env.DB.prepare("SELECT id FROM users WHERE LOWER(email) = ? LIMIT 1").bind(email).first();
   }
   if (!user) return json({ ok: false, error: "application_user_unavailable" }, 503, request, env);
+  await env.DB.prepare(
+    "INSERT INTO program_memberships (id, user_id, program_id, role) VALUES (?, ?, 'paducah-go-soccer-league', 'staff') ON CONFLICT(user_id, program_id, role) DO NOTHING",
+  ).bind(crypto.randomUUID(), user.id).run();
 
   const code = await createHandoffCodeForUser(env, {
     userId: user.id,
