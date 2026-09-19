@@ -120,9 +120,15 @@ async function getSessionUser(env, sessionToken) {
 
 // Mints a one-time code the source host embeds in a redirect URL so the target subdomain
 // (which cannot read the source host's cookie) can exchange it for its own session cookie.
-async function createHandoffCode(env, { sessionToken, sourceHost, targetHost }) {
-  const user = await getSessionUser(env, sessionToken);
-  if (!user) return null;
+async function createHandoffCodeForUser(env, { userId, sourceHost, targetHost }) {
+  if (!userId || !sourceHost || !targetHost) return null;
+  const allowedHosts = new Set([
+    "app.lifeprepacademyfoundation.com",
+    "paducahgo.lifeprepacademyfoundation.com",
+    "pnffl.lifeprepacademyfoundation.com",
+    "pnffc.lifeprepacademyfoundation.com",
+  ]);
+  if (!allowedHosts.has(String(targetHost).toLowerCase())) return null;
 
   const db = env.DB;
   const rawCode = randomToken();
@@ -133,10 +139,20 @@ async function createHandoffCode(env, { sessionToken, sourceHost, targetHost }) 
     .prepare(
       "INSERT INTO auth_handoff_codes (id, code_hash, user_id, source_host, target_host, expires_at) VALUES (?, ?, ?, ?, ?, ?)"
     )
-    .bind(crypto.randomUUID(), codeHash, user.id, sourceHost, targetHost, expiresAt)
+    .bind(crypto.randomUUID(), codeHash, userId, sourceHost, targetHost, expiresAt)
     .run();
 
   return rawCode;
+}
+
+async function createHandoffCode(env, { sessionToken, sourceHost, targetHost }) {
+  const user = await getSessionUser(env, sessionToken);
+  if (!user) return null;
+  return createHandoffCodeForUser(env, {
+    userId: user.id,
+    sourceHost,
+    targetHost,
+  });
 }
 
 // Redeems a handoff code exactly once and issues a fresh session on the target host.
@@ -183,5 +199,6 @@ export {
   verifyMagicLink,
   getSessionUser,
   createHandoffCode,
+  createHandoffCodeForUser,
   redeemHandoffCode,
 };
