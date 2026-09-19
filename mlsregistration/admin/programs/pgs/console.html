@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="robots" content="noindex,nofollow">
+  <title>Paducah GO Admin | LifePrep Academy Foundation</title>
+  <link rel="stylesheet" href="/admin/programs/pgs/console.css?v=2026-09-19-1">
+</head>
+<body class="pgs-admin">
+  <header class="topbar">
+    <a class="brand" href="https://app.lifeprepacademyfoundation.com/programs">
+      <img src="/LPAFxPGS.PNG" alt="Paducah GO Soccer">
+      <span><strong>Paducah GO</strong><small>League administration</small></span>
+    </a>
+    <div class="account">
+      <span id="access-status" class="status status-loading">Checking access</span>
+      <button id="logout-button" class="button button-quiet" type="button">Log out</button>
+    </div>
+  </header>
+
+  <div class="shell" id="admin-shell" hidden>
+    <aside class="sidebar">
+      <div class="workspace-label"><small>Current program</small><strong>Paducah GO Soccer</strong><span>Operations workspace</span></div>
+      <label class="season-picker">Season
+        <select id="season-select" aria-label="Current season"></select>
+      </label>
+      <nav id="admin-nav" aria-label="Paducah GO administration">
+        <button class="nav-item is-active" data-view="dashboard" type="button">⌂ <span>Dashboard</span></button>
+        <button class="nav-item" data-view="registration" type="button">◷ <span>Registration</span></button>
+        <button class="nav-item" data-view="registrants" type="button">♙ <span>Registrants</span></button>
+        <button class="nav-item" data-view="seasons" type="button">▦ <span>Seasons</span></button>
+        <button class="nav-item" data-view="announcements" type="button">✦ <span>Announcements</span></button>
+        <button class="nav-item" data-view="staff" type="button">♧ <span>Staff & assignments</span></button>
+        <button class="nav-item" data-view="activity" type="button">⌁ <span>Activity log</span></button>
+      </nav>
+      <div class="sidebar-foot">
+        <a href="https://app.lifeprepacademyfoundation.com/programs">Switch program</a>
+        <a href="https://lifeprepacademyfoundation.com/admin">LifePrep admin</a>
+      </div>
+    </aside>
+
+    <main class="main">
+      <div id="notice" class="notice" role="status"></div>
+      <div id="view" aria-live="polite"><div class="loading">Loading Paducah GO administration…</div></div>
+    </main>
+  </div>
+
+  <section id="access-required" class="access-card" hidden>
+    <img src="/LPAFxPGS.PNG" alt="Paducah GO Soccer">
+    <p class="eyebrow">Secure staff access</p>
+    <h1>Paducah GO administration</h1>
+    <p id="access-message">Cloudflare Access must approve this staff account before the management workspace can load.</p>
+    <a class="button button-primary" href="https://lifeprepacademyfoundation.com/admin">Open LifePrep admin login</a>
+  </section>
+
+  <script src="/admin/programs/pgs/console.js?v=2026-09-19-1" defer></script>
+</body>
+</html>
