@@ -8,6 +8,14 @@
 			"zone_name": "lifeprepacademyfoundation.com"
 		},
 		{
+			"pattern": "pnffl.lifeprepacademyfoundation.com/*",
+			"zone_name": "lifeprepacademyfoundation.com"
+		},
+		{
+			"pattern": "pnffc.lifeprepacademyfoundation.com/*",
+			"zone_name": "lifeprepacademyfoundation.com"
+		},
+		{
 			"pattern": "lifeprepacademyfoundation.com/admin*",
 			"zone_name": "lifeprepacademyfoundation.com"
 		},
