@@ -108,7 +108,7 @@
     const values = [
       ["Registrations", metrics.registrations || 0],
       ["Submitted", metrics.submitted || 0],
-      ["Complete", metrics.paid || 0],
+      ["Players", metrics.participants || 0],
       ["Teams", metrics.teams || 0],
       ["Announcements", metrics.activeAnnouncements || 0]
     ];
