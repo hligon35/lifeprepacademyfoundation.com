@@ -32,6 +32,7 @@ import {
   requestMagicLink,
   verifyMagicLink,
   getSessionUser,
+  revokeSession,
   createHandoffCode,
   createHandoffCodeForUser,
   redeemHandoffCode,
@@ -406,6 +407,9 @@ export default {
     if (url.pathname === "/api/auth/session" && request.method === "GET") {
       return handleAuthSession(request, env);
     }
+    if (url.pathname === "/api/auth/logout" && request.method === "POST") {
+      return handleAuthLogout(request, env);
+    }
     if (url.pathname === "/api/auth/access-exchange" && request.method === "POST") {
       return handleAuthAccessExchange(request, env);
     }
@@ -447,9 +451,12 @@ export default {
     if (isAppHost(url.hostname)) {
       if (url.pathname === "/dashboard" || url.pathname === "/dashboard/") {
         const access = await getAdminContext(request, env);
-        if (!access.ok && !request.headers.get("CF-Access-Jwt-Assertion")) {
+        if (!access.ok && !request.headers.get("CF-Access-Jwt-Assertion") && !url.searchParams.has("auth_attempt")) {
           const loginUrl = new URL("/cdn-cgi/access/login", url.origin);
-          loginUrl.searchParams.set("redirect_url", url.toString());
+          const returnUrl = new URL(url.toString());
+          returnUrl.searchParams.set("auth_reason", "login");
+          returnUrl.searchParams.set("auth_attempt", "1");
+          loginUrl.searchParams.set("redirect_url", returnUrl.toString());
           return Response.redirect(loginUrl.toString(), 302);
         }
         return handleAdminAssetPage(request, env, "/admin/index.html");
@@ -495,6 +502,7 @@ async function handleAuthRequestLink(request, env) {
   const result = await requestMagicLink(env, {
     email: body?.email,
     requestOrigin: url.origin,
+    returnTo: body?.returnTo,
   });
   return json(result, 200, request, env);
 }
@@ -505,10 +513,11 @@ async function handleAuthVerify(request, env) {
   const result = await verifyMagicLink(env, { token, host: url.hostname });
   if (!result.ok) return json(result, 401, request, env);
 
-  const headers = new Headers({ Location: "/" });
+  const returnTo = result.returnTo || "/dashboard";
+  const headers = new Headers({ Location: returnTo, "Cache-Control": "no-store" });
   headers.append(
     "Set-Cookie",
-    `session=${result.sessionToken}; Path=/; Secure; HttpOnly; SameSite=Lax; Expires=${new Date(result.expiresAt).toUTCString()}`,
+    buildSessionCookie(result.sessionToken, result.expiresAt),
   );
   return new Response(null, { status: 302, headers });
 }
@@ -528,8 +537,9 @@ async function handleAuthHandoffCreate(request, env) {
 
 
 async function handleAuthSession(request, env) {
-  const sessionUser = await getSessionUser(env, getCookie(request, "session"));
-  if (!sessionUser) return json({ ok: false, error: "authentication_required" }, 401, request, env);
+  const sessionToken = getSessionToken(request);
+  const sessionUser = await getSessionUser(env, sessionToken);
+  if (!sessionUser) return json({ ok: false, error: sessionToken ? "session_expired" : "authentication_required" }, 401, request, env);
   const memberships = await env.DB.prepare(
     "SELECT program_id AS programId, role, status FROM program_memberships WHERE user_id = ? AND status = 'active' ORDER BY program_id, role",
   ).bind(sessionUser.id).all();
@@ -539,6 +549,14 @@ async function handleAuthSession(request, env) {
     roles: (memberships.results || []).map((item) => item.role),
     memberships: memberships.results || [],
   }, 200, request, env);
+}
+
+async function handleAuthLogout(request, env) {
+  await revokeSession(env, getSessionToken(request));
+  const headers = new Headers({ "Content-Type": "application/json", "Cache-Control": "no-store" });
+  headers.append("Set-Cookie", clearSessionCookie());
+  headers.append("Set-Cookie", "session=; Path=/; Secure; HttpOnly; SameSite=Lax; Max-Age=0");
+  return new Response(JSON.stringify({ ok: true }), { status: 200, headers });
 }
 
 async function handleAuthAccessExchange(request, env) {
@@ -582,9 +600,9 @@ async function handleAuthHandoffGet(request, env) {
   const result = await redeemHandoffCode(env, { code: url.searchParams.get("code"), targetHost: url.hostname });
   if (!result.ok) return new Response("This sign-in handoff is invalid or expired.", { status: 401 });
   const returnTo = String(url.searchParams.get("returnTo") || "/dashboard");
-  const safeReturnTo = returnTo.startsWith("/") && !returnTo.startsWith("//") ? returnTo : "/dashboard";
+  const safeReturnTo = returnTo.startsWith("/") && !returnTo.startsWith("//") && !returnTo.startsWith("/api/") && !returnTo.startsWith("/cdn-cgi/") && !returnTo.includes("\\") ? returnTo : "/dashboard";
   const headers = new Headers({ Location: safeReturnTo, "Cache-Control": "no-store" });
-  headers.append("Set-Cookie", "session=" + encodeURIComponent(result.sessionToken) + "; Path=/; Secure; HttpOnly; SameSite=Lax; Expires=" + new Date(result.expiresAt).toUTCString());
+  headers.append("Set-Cookie", buildSessionCookie(result.sessionToken, result.expiresAt));
   return new Response(null, { status: 302, headers });
 }
 
@@ -597,7 +615,7 @@ async function handleAuthHandoffRedeem(request, env) {
   const headers = new Headers({ "Content-Type": "application/json", "Cache-Control": "no-store" });
   headers.append(
     "Set-Cookie",
-    `session=${result.sessionToken}; Path=/; Secure; HttpOnly; SameSite=Lax; Expires=${new Date(result.expiresAt).toUTCString()}`,
+    buildSessionCookie(result.sessionToken, result.expiresAt),
   );
   return new Response(JSON.stringify({ ok: true }), { status: 200, headers });
 }
@@ -606,6 +624,18 @@ function getCookie(request, name) {
   const header = request.headers.get("Cookie") || "";
   const match = header.match(new RegExp(`(?:^|; )${name}=([^;]+)`));
   return match ? decodeURIComponent(match[1]) : null;
+}
+
+function getSessionToken(request) {
+  return getCookie(request, "__Host-lp_session") || getCookie(request, "session");
+}
+
+function buildSessionCookie(token, expiresAt) {
+  return `__Host-lp_session=${encodeURIComponent(token)}; Path=/; Secure; HttpOnly; SameSite=Lax; Expires=${new Date(expiresAt).toUTCString()}`;
+}
+
+function clearSessionCookie() {
+  return "__Host-lp_session=; Path=/; Secure; HttpOnly; SameSite=Lax; Max-Age=0";
 }
 
 function handleAdminAssetPage(request, env, assetPath, role = "") {

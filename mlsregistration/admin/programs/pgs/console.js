@@ -59,13 +59,25 @@
     }, 5000);
   };
 
-  const showAccessRequired = (message) => {
+  const showAccessRequired = (message, mode = "login") => {
+    $("#auth-loading").hidden = true;
     $("#admin-shell").hidden = true;
     $("#access-required").hidden = false;
     $("#access-message").textContent = message || "Cloudflare Access authentication is required.";
+    $("#access-heading").textContent = mode === "forbidden" ? "Access not approved" : "Paducah GO administration";
+    $("#access-required a")?.toggleAttribute("hidden", mode === "forbidden");
     const status = $("#access-status");
     status.textContent = "Access required";
     status.className = "status status-bad";
+  };
+
+  const redirectToAccessLogin = (reason = "login") => {
+    const loginUrl = new URL("/cdn-cgi/access/login", window.location.origin);
+    const returnUrl = new URL(window.location.href);
+    returnUrl.searchParams.set("auth_reason", reason);
+    returnUrl.searchParams.set("auth_attempt", "1");
+    loginUrl.searchParams.set("redirect_url", returnUrl.toString());
+    window.location.replace(loginUrl.toString());
   };
 
   const roleIds = () => {
@@ -769,12 +781,24 @@
   }
 
   async function loadSession() {
-    const payload = await api("/api/admin/session");
+    const response = await fetch("/api/admin/session", { credentials: "include" });
+    const payload = await response.json().catch(() => null);
+    if (!response.ok || !payload?.ok) {
+      if (response.status === 401 && !new URLSearchParams(window.location.search).has("auth_attempt")) {
+        redirectToAccessLogin("login");
+        return false;
+      }
+      showAccessRequired(response.status === 403
+        ? (payload?.error || "Your Google account is recognized, but it is not approved for Paducah GO administration.")
+        : (payload?.error || "Secure authentication is required."), response.status === 403 ? "forbidden" : "login");
+      return false;
+    }
     state.session = payload;
     const status = $("#access-status");
     status.textContent = "Signed in: " + (payload.user && (payload.user.displayName || payload.user.email) || "admin");
     status.className = "status status-good";
     state.canManage = canManageProgram();
+    $("#auth-loading").hidden = true;
     $("#admin-shell").hidden = false;
     $("#access-required").hidden = true;
     const pathView = location.pathname.split("/").filter(Boolean).pop();
@@ -802,5 +826,7 @@
     window.location.href = "/cdn-cgi/access/logout?returnTo=" + encodeURIComponent("https://lifeprepacademyfoundation.com/admin");
   };
 
-  loadSession().then(() => loadWorkspace(true)).catch((error) => showAccessRequired(error.message));
+  loadSession().then((authenticated) => {
+    if (authenticated !== false) return loadWorkspace(true);
+  }).catch((error) => showAccessRequired(error.message));
 })();

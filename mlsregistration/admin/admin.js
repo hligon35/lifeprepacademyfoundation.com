@@ -23,16 +23,36 @@
     return Number.isNaN(date.getTime()) ? value : date.toLocaleString([], { dateStyle: "medium", timeStyle: "short" });
   }
 
-  function setAccessRequired(message) {
+  function setAccessRequired(message, mode = "login") {
+    const loading = $("#auth-loading");
+    if (loading) loading.hidden = true;
     $("#admin-dashboard").hidden = true;
     $("#access-required").hidden = false;
     if (message) $("#access-message").textContent = message;
+    $("#access-heading").textContent = mode === "forbidden" ? "Access not approved" : "Sign in to continue";
+    $("#access-login-link").hidden = mode === "forbidden";
     setAccessStatus("Access required", "error");
   }
 
-  function redirectToAccessLogin() {
+  function showWelcome(user, reason) {
+    const loading = $("#auth-loading");
+    if (loading) loading.hidden = true;
+    const name = user?.displayName || user?.email || "your approved account";
+    const welcome = $("#admin-welcome");
+    if (!welcome) return;
+    welcome.textContent = reason === "expired"
+      ? `Your previous secure session expired. Welcome back, ${name}.`
+      : `Welcome back, ${name}. Your secure session is active.`;
+    welcome.hidden = false;
+    window.setTimeout(() => { welcome.hidden = true; }, 4500);
+  }
+
+  function redirectToAccessLogin(reason = "login") {
     const loginUrl = new URL("/cdn-cgi/access/login", window.location.origin);
-    loginUrl.searchParams.set("redirect_url", window.location.href);
+    const returnUrl = new URL(window.location.href);
+    returnUrl.searchParams.set("auth_reason", reason);
+    returnUrl.searchParams.set("auth_attempt", "1");
+    loginUrl.searchParams.set("redirect_url", returnUrl.toString());
     window.location.replace(loginUrl.toString());
   }
 
@@ -40,16 +60,24 @@
     const response = await api("/api/admin/session");
     const payload = await response.json().catch(() => null);
     if (!response.ok || !payload?.ok) {
-      if (isAppHost) {
-        redirectToAccessLogin();
+      if (response.status === 401 && isAppHost && !new URLSearchParams(window.location.search).has("auth_attempt")) {
+        redirectToAccessLogin(new URLSearchParams(window.location.search).get("auth_reason") || "login");
         return false;
       }
-      setAccessRequired(payload?.error || "Cloudflare Access authentication is required.");
+      setAccessRequired(response.status === 403
+        ? (payload?.error || "Your Google account is recognized, but it is not approved for LifePrep administration.")
+        : (payload?.error || "Cloudflare Access authentication is required."), response.status === 403 ? "forbidden" : "login");
       return false;
     }
     setAccessStatus(`Signed in: ${payload.user?.displayName || payload.user?.email || "admin"}`, "active");
     $("#admin-dashboard").hidden = false;
     $("#access-required").hidden = true;
+    showWelcome(payload.user, new URLSearchParams(window.location.search).get("auth_reason"));
+    if (window.location.search.includes("auth_reason=")) {
+      const cleanUrl = new URL(window.location.href);
+      cleanUrl.searchParams.delete("auth_reason");
+      window.history.replaceState({}, "", cleanUrl.toString());
+    }
     return true;
   }
 

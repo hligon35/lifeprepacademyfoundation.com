@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Programs Dashboard | LifePrep Academy Foundation</title>
     <meta name="robots" content="noindex,nofollow" />
-    <link rel="stylesheet" href="/admin/admin.css?v=2026-09-16-1" />
+    <link rel="stylesheet" href="/admin/admin.css?v=2026-09-19-4" />
   </head>
   <body class="admin-body">
     <header class="admin-topbar">
@@ -13,7 +13,7 @@
       <div class="admin-account"><span id="admin-status" class="status-pill status-pill--loading">Checking access</span><button id="logout-button" class="button button--quiet" type="button">Log out</button></div>
     </header>
     <main class="programs-main">
-      <div class="programs-wrap">
+      <div class="programs-wrap" id="programs-content" hidden>
         <p class="eyebrow">LifePrep Academy Foundation</p>
         <h1>Choose a program</h1>
         <p class="program-note">Open a program dashboard to manage its registrations, people, and operations.</p>
@@ -33,6 +33,18 @@
         </div>
       </div>
     </main>
-    <script src="/admin/programs/programs.js?v=2026-09-16-1" defer></script>
+    <section id="auth-loading" class="auth-card" aria-live="polite">
+      <div class="auth-spinner" aria-hidden="true"></div>
+      <p class="eyebrow">Secure LifePrep access</p>
+      <h1>Checking your session</h1>
+      <p>We are securely checking whether your approved Google account is already signed in.</p>
+    </section>
+    <section id="access-required" class="access-card" hidden>
+      <p class="eyebrow">Secure administrator access</p>
+      <h1 id="access-heading">Sign in to continue</h1>
+      <p id="access-message">Cloudflare Access will authenticate you with the approved Google account.</p>
+      <a class="button button--primary" id="access-login-link" href="/admin">Continue to secure login</a>
+    </section>
+    <script src="/admin/programs/programs.js?v=2026-09-19-4" defer></script>
   </body>
 </html>

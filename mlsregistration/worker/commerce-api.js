@@ -284,7 +284,7 @@ async function refundOrder(request, env, context, orderId) {
 }
 
 async function createCheckout(request, env) {
-  const user = await getSessionUser(env, getCookie(request, "session"));
+  const user = await getSessionUser(env, getSessionToken(request));
   if (!user) return json({ ok: false, error: "authentication_required", loginRequired: true }, 401, request);
   const payload = await request.json().catch(() => null);
   const programId = text(payload?.programId) || DEFAULT_PROGRAM_ID;
@@ -377,7 +377,7 @@ async function createSquarePaymentLink(env, request, order) {
 }
 
 async function listUserOrders(request, env) {
-  const user = await getSessionUser(env, getCookie(request, "session"));
+  const user = await getSessionUser(env, getSessionToken(request));
   if (!user) return json({ ok: false, error: "authentication_required", loginRequired: true }, 401, request);
   const rows = await env.DB.prepare(
     "SELECT o.id, o.status, o.fulfillment_status, o.total_cents, o.created_at, o.updated_at, GROUP_CONCAT(oi.product_name || CASE WHEN oi.variant_name IS NULL THEN '' ELSE ' · ' || oi.variant_name END || ' ×' || oi.quantity, ', ') AS item_summary FROM orders o LEFT JOIN order_items oi ON oi.order_id = o.id WHERE o.user_id = ? ORDER BY o.created_at DESC LIMIT 50",
@@ -459,6 +459,10 @@ function getCookie(request, name) {
   const header = request.headers.get("Cookie") || "";
   const match = header.match(new RegExp("(?:^|; )" + name + "=([^;]+)"));
   return match ? decodeURIComponent(match[1]) : null;
+}
+
+function getSessionToken(request) {
+  return getCookie(request, "__Host-lp_session") || getCookie(request, "session");
 }
 
 async function handleCommerceApi(request, env, context) {

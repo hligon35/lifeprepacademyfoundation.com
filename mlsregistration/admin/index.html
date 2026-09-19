@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>LifePrep Academy Foundation Admin</title>
     <meta name="robots" content="noindex,nofollow" />
-    <link rel="stylesheet" href="/admin/admin.css?v=2026-09-16-1" />
+    <link rel="stylesheet" href="/admin/admin.css?v=2026-09-19-4" />
   </head>
   <body class="admin-body">
     <div class="admin-app">
@@ -15,12 +15,20 @@
           <span>LifePrep Academy Foundation</span>
         </a>
         <div class="admin-account">
-          <span id="admin-status" class="status-pill status-pill--loading">Checking access</span>
+        <span id="admin-status" class="status-pill status-pill--loading">Checking secure session</span>
           <button id="logout-button" class="button button--quiet" type="button">Log out</button>
         </div>
       </header>
 
+      <section id="auth-loading" class="auth-card" aria-live="polite">
+        <div class="auth-spinner" aria-hidden="true"></div>
+        <p class="eyebrow">Secure LifePrep access</p>
+        <h1>Checking your session</h1>
+        <p>We are securely checking whether your approved Google account is already signed in.</p>
+      </section>
+
       <main class="admin-main" id="admin-dashboard" hidden>
+        <div id="admin-welcome" class="welcome-banner" role="status" hidden></div>
         <div class="page-heading">
           <div>
             <p class="eyebrow">Website dashboard</p>
@@ -57,11 +65,11 @@
       <section id="access-required" class="access-card" hidden>
         <img src="https://www.lifeprepacademyfoundation.com/icons/icon-192.png" alt="LifePrep Academy Foundation" width="72" height="72" />
         <p class="eyebrow">Secure administrator access</p>
-        <h1>Sign in to continue</h1>
+        <h1 id="access-heading">Sign in to continue</h1>
         <p id="access-message">Cloudflare Access will authenticate you with the approved Google account.</p>
         <a class="button button--primary" id="access-login-link" href="/admin">Continue to secure login</a>
       </section>
     </div>
-    <script src="/admin/admin.js?v=2026-09-16-1" defer></script>
+    <script src="/admin/admin.js?v=2026-09-19-4" defer></script>
   </body>
 </html>

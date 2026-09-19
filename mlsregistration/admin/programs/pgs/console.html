@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="robots" content="noindex,nofollow">
   <title>Paducah GO Admin | LifePrep Academy Foundation</title>
-  <link rel="stylesheet" href="/admin/programs/pgs/console.css?v=2026-09-19-1">
+  <link rel="stylesheet" href="/admin/programs/pgs/console.css?v=2026-09-19-2">
 </head>
 <body class="pgs-admin">
   <header class="topbar">
@@ -55,11 +55,18 @@
   <section id="access-required" class="access-card" hidden>
     <img src="/PGSlogo.png" alt="Paducah GO Soccer">
     <p class="eyebrow">Secure staff access</p>
-    <h1>Paducah GO administration</h1>
+    <h1 id="access-heading">Paducah GO administration</h1>
     <p id="access-message">Cloudflare Access must approve this staff account before the management workspace can load.</p>
     <a class="button button-primary" href="https://lifeprepacademyfoundation.com/admin">Open LifePrep admin login</a>
   </section>
 
-    <script src="/admin/programs/pgs/console.js?v=2026-09-19-3" defer></script>
+  <section id="auth-loading" class="access-card" aria-live="polite">
+    <div class="auth-spinner" aria-hidden="true"></div>
+    <p class="eyebrow">Secure staff access</p>
+    <h1>Checking your session</h1>
+    <p>We are securely checking your approved Google account before opening league operations.</p>
+  </section>
+
+    <script src="/admin/programs/pgs/console.js?v=2026-09-19-4" defer></script>
 </body>
 </html>

@@ -18,6 +18,13 @@ Admin authentication is provided by Cloudflare Access using Google as the identi
 provider. Configure `CF_ACCESS_TEAM_DOMAIN` and `CF_ACCESS_AUD` as Worker vars and
 set `ADMIN_BOOTSTRAP_EMAIL` to the first approved Google account. The Worker
 validates the Access JWT and then checks the D1 `admin_users`/RBAC records.
+Admin pages show a secure-session loading state and a short welcome-back confirmation after
+Access succeeds. A valid Google/Access identity is not asked to click a second login button.
+
+Family/program accounts use one-time email login links. Login tickets expire after one hour and
+are single-use. Successful app sessions use a host-only `__Host-lp_session` HttpOnly/Secure
+cookie, are hashed in D1, and can be explicitly revoked through the app logout endpoint.
+Cross-subdomain movement uses one-use handoff codes rather than `localStorage` tokens.
 
 For local Wrangler-only testing, use `ADMIN_DEV_EMAIL` and `ADMIN_DEV_TOKEN` in
 `.dev.vars`. Do not configure those two values in production.

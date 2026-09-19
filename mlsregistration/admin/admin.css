@@ -58,6 +58,12 @@ h2 { margin-bottom: 0; font-size: 1.45rem; }
 .access-card { width: min(520px, calc(100% - 36px)); margin: 10vh auto; padding: 42px 34px; text-align: center; background: var(--surface); border: 1px solid var(--line); border-radius: 22px; box-shadow: 0 20px 60px rgba(23,32,51,.08); }
 .access-card img { object-fit: contain; margin-bottom: 18px; }
 .access-card p:not(.eyebrow) { color: var(--muted); line-height: 1.6; }
+.auth-card { width: min(520px, calc(100% - 36px)); margin: 10vh auto; padding: 42px 34px; text-align: center; background: var(--surface); border: 1px solid var(--line); border-radius: 22px; box-shadow: 0 20px 60px rgba(23,32,51,.08); }
+.auth-card h1 { font-size: clamp(1.7rem, 4vw, 2.5rem); }
+.auth-card p:not(.eyebrow) { color: var(--muted); line-height: 1.6; }
+.auth-spinner { width: 34px; height: 34px; margin: 0 auto 20px; border: 4px solid var(--purple-soft); border-top-color: var(--purple); border-radius: 50%; animation: auth-spin .8s linear infinite; }
+.welcome-banner { margin: 0 0 24px; padding: 14px 18px; color: var(--success); background: #e8f6ee; border: 1px solid #bfe4cf; border-radius: 12px; font-weight: 750; }
+@keyframes auth-spin { to { transform: rotate(360deg); } }
 .programs-main { min-height: calc(100vh - 72px); display: grid; place-items: center; padding: 50px 20px 80px; }
 .programs-wrap { width: min(1040px, 100%); text-align: center; }
 .program-grid { display: grid; grid-template-columns: repeat(2, minmax(240px, 1fr)); gap: clamp(30px, 7vw, 80px); justify-items: center; margin-top: 42px; }
