@@ -79,13 +79,14 @@ async function getProgramWorkspace(request, env, context) {
   const programId = text(url.searchParams.get("programId"));
   if (!programId || !canViewProgram(context, programId)) return denied();
 
-  const [program, seasons, season, registration, counts, teamCount, announcementCount, staffCount] =
+  const [program, seasons, season, registration, counts, participantCount, teamCount, announcementCount, staffCount] =
     await Promise.all([
       env.DB.prepare("SELECT id, name, status FROM programs WHERE id = ? LIMIT 1").bind(programId).first(),
       env.DB.prepare("SELECT id, program_id, name, status, starts_on, ends_on FROM seasons WHERE program_id = ? ORDER BY starts_on DESC, created_at DESC").bind(programId).all(),
       selectedSeason(env, programId, text(url.searchParams.get("seasonId"))),
       getRegistrationOverview(env, programId),
       env.DB.prepare("SELECT status, COUNT(*) AS count FROM registrations WHERE program_id = ? GROUP BY status ORDER BY status").bind(programId).all(),
+      env.DB.prepare("SELECT COUNT(*) AS count FROM registration_participants p JOIN registrations r ON r.id = p.registration_id WHERE r.program_id = ? AND r.status != 'withdrawn'").bind(programId).first(),
       env.DB.prepare("SELECT COUNT(*) AS count FROM roster_teams WHERE program_id = ? AND (season_id = ? OR ? IS NULL)").bind(programId, text(url.searchParams.get("seasonId")) || null, text(url.searchParams.get("seasonId")) || null).first(),
       env.DB.prepare("SELECT COUNT(*) AS count FROM announcements WHERE program_id = ? AND status IN ('published', 'scheduled')").bind(programId).first(),
       env.DB.prepare("SELECT COUNT(*) AS count FROM admin_assignments WHERE program_id = ? AND status = 'active'").bind(programId).first(),
@@ -116,7 +117,7 @@ async function getProgramWorkspace(request, env, context) {
       registrations: Object.values(registrationsByStatus).reduce((sum, value) => sum + value, 0),
       submitted: registration.submittedCount,
       paid: registrationsByStatus.complete || 0,
-      participants: registrationsByStatus.complete || 0,
+      participants: Number(participantCount?.count || 0),
       teams: Number(teamCount?.count || 0),
       activeAnnouncements: Number(announcementCount?.count || 0),
       staffAssignments: Number(staffCount?.count || 0),
