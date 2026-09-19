@@ -14,6 +14,8 @@
     assignments: [],
     directory: [],
     activity: [],
+    products: [],
+    orders: [],
     view: "dashboard",
     seasonId: "",
     canManage: false
@@ -634,6 +636,79 @@
     });
   }
 
+  async function loadCommerceProducts() {
+    const payload = await api("/api/admin/commerce/products?programId=" + encodeURIComponent(PROGRAM_ID));
+    state.products = payload.products || [];
+  }
+
+  async function renderMerchandise() {
+    await loadCommerceProducts();
+    $("#view").innerHTML =
+      pageHead("Commerce", "Merchandise", "Publish products, size or kit variants, inventory counts, images, and Square checkout settings for Paducah GO families.", "") +
+      '<div class="grid"><section class="card span-5"><h2>Add merchandise</h2>' +
+      (canManageProgram() ? '<form id="product-form" class="form-grid"><div class="field full"><label for="product-name">Product name</label><input class="form-control" id="product-name" required placeholder="Paducah GO jersey"></div><div class="field full"><label for="product-description">Description</label><textarea class="form-control" id="product-description" placeholder="Official Paducah GO gear."></textarea></div><div class="field"><label for="product-category">Category</label><input class="form-control" id="product-category" value="merchandise"></div><div class="field"><label for="product-image">Image</label><input class="form-control" id="product-image" type="file" accept="image/*"></div><div class="field"><label for="variant-name">Variant / size</label><input class="form-control" id="variant-name" value="Standard"></div><div class="field"><label for="variant-sku">SKU</label><input class="form-control" id="variant-sku" placeholder="PGS-JERSEY-M"></div><div class="field"><label for="variant-price">Price in dollars</label><input class="form-control" id="variant-price" type="number" min="0" step="0.01" required></div><div class="field"><label for="variant-inventory">Inventory (-1 unlimited)</label><input class="form-control" id="variant-inventory" type="number" min="-1" value="-1"></div><div class="field full"><label for="variant-checkout">Existing Square payment link (optional)</label><input class="form-control" id="variant-checkout" type="url" placeholder="https://square.link/u/..."></div><div class="field full"><p class="muted">Use an existing Square link for a simple product, or configure the server-side Square API for dynamic cart checkout.</p><div class="actions">' + button("Publish product", "save-product", "button-gold") + "</div></div></form>" : '<p class="muted">Only program administrators can manage merchandise.</p>') +
+      '</section><section class="card span-7"><h2>Published catalog</h2><div class="activity-list">' +
+      (state.products.length ? state.products.map((product) => '<div class="activity"><div><strong>' + esc(product.name) + '</strong><div class="activity-meta">' + esc(product.category || "merchandise") + ' · ' + esc(product.status) + ' · ' + (product.variants || []).map((variant) => esc(variant.name + " $" + (Number(variant.price_cents || 0) / 100).toFixed(2) + (Number(variant.inventory_count) < 0 ? " unlimited" : " " + Math.max(0, Number(variant.inventory_count) - Number(variant.reserved_count || 0)) + " available"))).join(" · ") + '</div></div>' + (canManageProgram() && product.status === "active" ? '<button class="button button-danger" data-product-archive="' + esc(product.id) + '" type="button">Archive</button>' : "") + '</div>').join("") : empty("No merchandise yet", "Add the first jersey, kit, or accessory to publish it in the Paducah GO shop.")) +
+      '</div></section></div>';
+    $("#product-form") && ($("#product-form").onsubmit = async (event) => {
+      event.preventDefault();
+      try {
+        let imageUrl = "";
+        const file = $("#product-image").files[0];
+        if (file) {
+          const form = new FormData();
+          form.append("file", file);
+          const upload = await api("/api/admin/commerce/upload?programId=" + encodeURIComponent(PROGRAM_ID), { method: "POST", body: form });
+          imageUrl = upload.imageUrl || "";
+        }
+        await api("/api/admin/commerce/products", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({
+          programId: PROGRAM_ID,
+          name: $("#product-name").value,
+          description: $("#product-description").value,
+          category: $("#product-category").value,
+          imageUrl,
+          variants: [{ name: $("#variant-name").value, sku: $("#variant-sku").value, priceCents: Math.round(Number($("#variant-price").value || 0) * 100), inventoryCount: Number($("#variant-inventory").value), squareCheckoutUrl: $("#variant-checkout").value }]
+        })});
+        showNotice("Merchandise published.");
+        await renderMerchandise();
+      } catch (error) { showNotice(error.message); }
+    });
+    document.querySelectorAll("[data-product-archive]").forEach((button) => {
+      button.onclick = async () => {
+        if (!window.confirm("Archive this merchandise product? Existing orders will remain in history.")) return;
+        try { await api("/api/admin/commerce/products/" + encodeURIComponent(button.dataset.productArchive), { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status: "archived", visible: false }) }); showNotice("Product archived."); await renderMerchandise(); }
+        catch (error) { showNotice(error.message); }
+      };
+    });
+  }
+
+  async function renderOrders() {
+    const payload = await api("/api/admin/commerce/orders?programId=" + encodeURIComponent(PROGRAM_ID) + "&status=all");
+    state.orders = payload.orders || [];
+    $("#view").innerHTML = pageHead("Commerce", "Orders", "Track payment and fulfillment status for Paducah GO merchandise orders.", button("Refresh", "refresh-orders", "button-quiet")) +
+      '<section class="card span-12"><div class="table-wrap"><table class="data-table"><thead><tr><th>Order</th><th>Customer</th><th>Items</th><th>Total</th><th>Payment</th><th>Fulfillment</th><th>Placed</th></tr></thead><tbody>' +
+      (state.orders.length ? state.orders.map((order) => '<tr><td><strong>' + esc(order.id.slice(0, 8).toUpperCase()) + '</strong></td><td>' + esc(order.customer_name || "—") + '<br><span class="muted">' + esc(order.customer_email || "") + '</span></td><td>' + esc(order.item_summary || "—") + '</td><td>$' + esc((Number(order.total_cents || 0) / 100).toFixed(2)) + '</td><td><select class="form-control" data-order-status="' + esc(order.id) + '"><option value="pending"' + (order.status === "pending" ? " selected" : "") + '>Pending</option><option value="paid"' + (order.status === "paid" ? " selected" : "") + '>Paid</option><option value="cancelled"' + (order.status === "cancelled" ? " selected" : "") + '>Cancelled</option><option value="refunded"' + (order.status === "refunded" ? " selected" : "") + '>Refunded</option></select>' + (order.status === "paid" && canManageProgram() ? ' <button class="button button-danger" data-order-refund="' + esc(order.id) + '" type="button">Refund</button>' : "") + '</td><td><select class="form-control" data-order-fulfillment="' + esc(order.id) + '"><option value="unfulfilled"' + (order.fulfillment_status === "unfulfilled" ? " selected" : "") + '>Unfulfilled</option><option value="ready"' + (order.fulfillment_status === "ready" ? " selected" : "") + '>Ready</option><option value="fulfilled"' + (order.fulfillment_status === "fulfilled" ? " selected" : "") + '>Fulfilled</option><option value="cancelled"' + (order.fulfillment_status === "cancelled" ? " selected" : "") + '>Cancelled</option></select></td><td>' + esc(formatDate(order.created_at)) + '</td></tr>').join("") : '<tr><td colspan="7">' + empty("No merchandise orders", "Orders will appear here after a family completes Square checkout.") + '</td></tr>') +
+      '</tbody></table></div></section>';
+    $("#refresh-orders").onclick = () => renderOrders().catch((error) => showNotice(error.message));
+    document.querySelectorAll("[data-order-refund]").forEach((button) => {
+      button.onclick = async () => {
+        if (!window.confirm("Refund this order through Square?")) return;
+        try { await api("/api/admin/commerce/orders/" + encodeURIComponent(button.dataset.orderRefund) + "/refund", { method: "POST" }); showNotice("Refund submitted."); await renderOrders(); }
+        catch (error) { showNotice(error.message); }
+      };
+    });
+    document.querySelectorAll("[data-order-status], [data-order-fulfillment]").forEach((select) => {
+      select.onchange = async () => {
+        const id = select.dataset.orderStatus || select.dataset.orderFulfillment;
+        const payload = {};
+        if (select.dataset.orderStatus) payload.status = select.value;
+        else payload.fulfillmentStatus = select.value;
+        try { await api("/api/admin/commerce/orders/" + encodeURIComponent(id), { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) }); showNotice("Order updated."); }
+        catch (error) { showNotice(error.message); }
+      };
+    });
+  }
+
   async function renderView() {
     setActiveNav();
     if (!state.workspace) return;
@@ -646,6 +721,8 @@
     if (state.view === "schedules") return renderSchedules();
     if (state.view === "attendance") return renderAttendance();
     if (state.view === "duties") return renderDuties();
+    if (state.view === "merchandise") return renderMerchandise();
+    if (state.view === "orders") return renderOrders();
     if (state.view === "staff") return renderStaff();
     if (state.view === "activity") return renderActivity();
     state.view = "dashboard";
@@ -702,8 +779,8 @@
     $("#access-required").hidden = true;
     const pathView = location.pathname.split("/").filter(Boolean).pop();
     const hashView = location.hash.replace("#", "");
-    if (["dashboard", "registration", "registrants", "seasons", "announcements", "rosters", "schedules", "attendance", "duties", "staff", "activity"].includes(hashView)) state.view = hashView;
-    else if (["registration", "registrants", "seasons", "announcements", "rosters", "schedules", "attendance", "duties", "staff", "activity"].includes(pathView)) state.view = pathView;
+    if (["dashboard", "registration", "registrants", "seasons", "announcements", "rosters", "schedules", "attendance", "duties", "merchandise", "orders", "staff", "activity"].includes(hashView)) state.view = hashView;
+    else if (["registration", "registrants", "seasons", "announcements", "rosters", "schedules", "attendance", "duties", "merchandise", "orders", "staff", "activity"].includes(pathView)) state.view = pathView;
     document.querySelectorAll("[data-view]").forEach((item) => {
       item.addEventListener("click", () => setView(item.dataset.view, true));
     });

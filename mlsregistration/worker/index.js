@@ -38,6 +38,12 @@ import {
 } from "./auth-magic-link.js";
 import { adminError, getAdminContext } from "./admin-auth.js";
 import { handleAdminApi } from "./admin-api.js";
+import {
+  createCheckout,
+  handleSquareWebhook,
+  listUserOrders,
+  publicProducts,
+} from "./commerce-api.js";
 
 const MAX_SIGNATURE_DATA_URL_BYTES = 1024 * 1024;
 const MAX_TYPED_SIGNATURE_LEN = 120;
@@ -185,6 +191,21 @@ export default {
     }
     if (url.pathname === "/api/public/program-schedule" && request.method === "GET") {
       return handlePublicProgramSchedule(request, env);
+    }
+    if (url.pathname === "/api/public/program-products" && request.method === "GET") {
+      return publicProducts(request, env);
+    }
+    if (url.pathname === "/api/commerce/orders/checkout" && request.method === "POST") {
+      return createCheckout(request, env);
+    }
+    if (url.pathname === "/api/commerce/orders" && request.method === "GET") {
+      return listUserOrders(request, env);
+    }
+    if (url.pathname === "/api/webhooks/square" && request.method === "POST") {
+      return handleSquareWebhook(request, env);
+    }
+    if (url.pathname.startsWith("/media/commerce/") && request.method === "GET") {
+      return handleCommerceMedia(request, env);
     }
     if (url.pathname === "/api/payment-session" && request.method === "GET") {
       return handlePaymentSession(request, env);
@@ -424,7 +445,16 @@ export default {
     }
 
     if (isAppHost(url.hostname)) {
-      if (url.pathname === "/" || url.pathname === "/dashboard" || url.pathname === "/dashboard/") {
+      if (url.pathname === "/dashboard" || url.pathname === "/dashboard/") {
+        const access = await getAdminContext(request, env);
+        if (!access.ok && !request.headers.get("CF-Access-Jwt-Assertion")) {
+          const loginUrl = new URL("/cdn-cgi/access/login", url.origin);
+          loginUrl.searchParams.set("redirect_url", url.toString());
+          return Response.redirect(loginUrl.toString(), 302);
+        }
+        return handleAdminAssetPage(request, env, "/admin/index.html");
+      }
+      if (url.pathname === "/" || url.pathname === "/index.html") {
         return handleAdminAssetPage(request, env, "/admin/index.html");
       }
       if (url.pathname === "/programs" || url.pathname === "/programs/") {
@@ -445,6 +475,18 @@ function isPgsHost(hostname) {
 
 function isAppHost(hostname) {
   return String(hostname || "").toLowerCase() === "app.lifeprepacademyfoundation.com";
+}
+
+async function handleCommerceMedia(request, env) {
+  if (!env?.SITE_STATIC) return new Response("Not found", { status: 404 });
+  const key = new URL(request.url).pathname.replace(/^\/media\//, "");
+  const object = await env.SITE_STATIC.get(key);
+  if (!object) return new Response("Not found", { status: 404 });
+  const headers = new Headers();
+  object.writeHttpMetadata(headers);
+  headers.set("Cache-Control", "public, max-age=31536000, immutable");
+  headers.set("ETag", object.httpEtag);
+  return new Response(object.body, { headers });
 }
 
 async function handleAuthRequestLink(request, env) {

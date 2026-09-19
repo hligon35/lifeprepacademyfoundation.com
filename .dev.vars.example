@@ -15,3 +15,5 @@ NEWSLETTER_PROVIDER_API_KEY=replace-with-local-provider-key
 NEWSLETTER_WEBHOOK_SECRET=replace-with-local-webhook-secret
 RESEND_API_KEY=replace-with-local-resend-key
 RESEND_FROM_EMAIL=replace-with-verified-sender@example.com
+SQUARE_ACCESS_TOKEN=replace-with-square-access-token
+SQUARE_WEBHOOK_SIGNATURE_KEY=replace-with-square-webhook-signature-key

@@ -2,7 +2,7 @@
 // distinct from the Cloudflare Access JWT staff layer in admin-auth.js.
 import { sendEmail } from "./email-senders.js";
 
-const LINK_TOKEN_TTL_MS = 15 * 60 * 1000; // 15 minutes to click the link
+const LINK_TOKEN_TTL_MS = 60 * 60 * 1000; // 1 hour to click the login ticket
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 day session
 const HANDOFF_CODE_TTL_MS = 60 * 1000; // 60 seconds to redeem on the target host
 
@@ -63,8 +63,8 @@ async function requestMagicLink(env, { email, requestOrigin }) {
     to: user.email,
     fromName: "LifePrep Youth Programs",
     subject: "Your sign-in link",
-    html: `<p>Click to sign in: <a href="${verifyUrl}">${verifyUrl}</a></p><p>This link expires in 15 minutes.</p>`,
-    plainText: `Sign in: ${verifyUrl}\nThis link expires in 15 minutes.`,
+    html: `<p>Click to sign in: <a href="${verifyUrl}">${verifyUrl}</a></p><p>This login ticket expires in 1 hour.</p>`,
+    plainText: `Sign in: ${verifyUrl}\nThis login ticket expires in 1 hour.`,
   });
 
   return { ok: true };

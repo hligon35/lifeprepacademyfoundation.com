@@ -2,15 +2,21 @@
   const $ = (selector) => document.querySelector(selector);
   const isAppHost = location.hostname === "app.lifeprepacademyfoundation.com";
   const dashboardPath = isAppHost ? "/dashboard" : "/admin";
+  const redirectToLogin = () => {
+    if (!isAppHost) return window.location.href = dashboardPath;
+    const loginUrl = new URL("/cdn-cgi/access/login", window.location.origin);
+    loginUrl.searchParams.set("redirect_url", window.location.href);
+    window.location.replace(loginUrl.toString());
+  };
   fetch("/api/admin/session", { credentials: "include" }).then(async (response) => {
     const payload = await response.json().catch(() => null);
     if (!response.ok || !payload?.ok) {
-      window.location.href = `${dashboardPath}?reason=${encodeURIComponent(payload?.error || "Access required")}`;
+      redirectToLogin();
       return;
     }
     const status = $("#admin-status");
     if (status) { status.textContent = `Signed in: ${payload.user?.displayName || payload.user?.email || "admin"}`; status.className = "status-pill status-pill--active"; }
-  }).catch(() => { window.location.href = dashboardPath; });
+  }).catch(() => { redirectToLogin(); });
   document.getElementById("admin-brand-link")?.setAttribute("href", dashboardPath);
   $("#logout-button")?.addEventListener("click", () => { window.location.href = `/cdn-cgi/access/logout?returnTo=${encodeURIComponent(`${window.location.origin}${dashboardPath}`)}`; });
   document.querySelectorAll("[data-program-target]").forEach((link) => {

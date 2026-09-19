@@ -58,6 +58,19 @@ wrangler secret put NEWSLETTER_PROVIDER_API_KEY
 wrangler secret put NEWSLETTER_WEBHOOK_SECRET
 ```
 
+Merchandise checkout uses Square. Keep the access token and webhook signature key
+as Worker secrets; configure the location, environment, and exact webhook URL as
+non-secret variables:
+
+```bash
+wrangler secret put SQUARE_ACCESS_TOKEN
+wrangler secret put SQUARE_WEBHOOK_SIGNATURE_KEY
+```
+
+Set `SQUARE_LOCATION_ID`, `SQUARE_ENVIRONMENT`, `SQUARE_API_VERSION`, and
+`SQUARE_WEBHOOK_URL` in Wrangler. The webhook URL must exactly match the URL used
+when creating the Square webhook subscription so signature verification succeeds.
+
 If Worker-owned email delivery is enabled, Resend is used first for outbound email;
 Cloudflare Email Sending (the `send_email` binding) is the fallback, and is also used
 directly for inter-system messaging and inbound auto-replies:

@@ -1,6 +1,7 @@
 import { adminError, getAdminContext } from "./admin-auth.js";
 import { getRegistrationOverview } from "./registration-status.js";
 import { handleOperationsApi } from "./operations-api.js";
+import { handleCommerceApi } from "./commerce-api.js";
 
 
 const PROGRAM_MANAGER_ROLES = new Set(["super_admin", "program_administrator"]);
@@ -497,6 +498,9 @@ async function handleAdminApi(request, env) {
     ) {
       return handleOperationsApi(request, env, context);
     }
+    if (path.startsWith("/api/admin/commerce/")) {
+      return handleCommerceApi(request, env, context);
+    }
     if (path === "/api/admin/program-workspace" && request.method === "GET") {
       return getProgramWorkspace(request, env, context);
     }
@@ -539,5 +543,4 @@ async function handleAdminApi(request, env) {
     return json({ ok: false, error: "Admin request failed" }, 500);
   }
 }
-
 

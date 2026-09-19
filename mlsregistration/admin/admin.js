@@ -30,10 +30,20 @@
     setAccessStatus("Access required", "error");
   }
 
+  function redirectToAccessLogin() {
+    const loginUrl = new URL("/cdn-cgi/access/login", window.location.origin);
+    loginUrl.searchParams.set("redirect_url", window.location.href);
+    window.location.replace(loginUrl.toString());
+  }
+
   async function loadSession() {
     const response = await api("/api/admin/session");
     const payload = await response.json().catch(() => null);
     if (!response.ok || !payload?.ok) {
+      if (isAppHost) {
+        redirectToAccessLogin();
+        return false;
+      }
       setAccessRequired(payload?.error || "Cloudflare Access authentication is required.");
       return false;
     }
