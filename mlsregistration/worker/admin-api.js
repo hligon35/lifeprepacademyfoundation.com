@@ -154,12 +154,24 @@ async function listRegistrants(request, env, context) {
     values.push(needle, needle, needle);
   }
   const rows = await env.DB.prepare(
-    "SELECT r.id, r.submission_id, r.registration_type, r.status, r.payment_status, r.agreement_status, r.parent_first_name, r.parent_last_name, r.parent_email, r.created_at, r.submitted_at, COUNT(p.id) AS participant_count, COALESCE(GROUP_CONCAT(TRIM(COALESCE(p.first_name, '') || ' ' || COALESCE(p.last_name, '')), ', '), '') AS participant_names FROM registrations r LEFT JOIN registration_participants p ON p.registration_id = r.id WHERE " + where.join(" AND ") + " GROUP BY r.id ORDER BY r.created_at DESC LIMIT ?",
+    "SELECT r.id, r.submission_id, r.registration_type, r.status, r.payment_status, r.agreement_status, r.scholarship_requested, r.parent_first_name, r.parent_last_name, r.parent_email, r.created_at, r.submitted_at, COUNT(CASE WHEN p.participant_type = 'player' THEN p.id END) AS participant_count, COALESCE((SELECT GROUP_CONCAT(player_name, '||') FROM (SELECT TRIM(COALESCE(p2.first_name, '') || ' ' || COALESCE(p2.last_name, '')) AS player_name FROM registration_participants p2 WHERE p2.registration_id = r.id AND p2.participant_type = 'player' AND TRIM(COALESCE(p2.first_name, '') || ' ' || COALESCE(p2.last_name, '')) <> '' ORDER BY p2.slot_index ASC, p2.created_at ASC)), '') AS participant_names, CASE WHEN (EXISTS (SELECT 1 FROM registration_documents d WHERE d.registration_id = r.id AND d.document_type = 'ppf_liability' AND d.status IN ('generated', 'viewed')) OR LOWER(COALESCE(json_extract(r.raw_payload_json, '$.agree_ppf_liability'), '')) IN ('yes', 'true', '1', 'on')) THEN 1 ELSE 0 END AS agreement_lpaf_complete, CASE WHEN (LOWER(COALESCE(json_extract(r.raw_payload_json, '$.agree_marketing'), '')) IN ('yes', 'true', '1', 'on') OR LOWER(COALESCE(json_extract(r.raw_payload_json, '$.agree_privacy'), '')) IN ('yes', 'true', '1', 'on')) THEN 1 ELSE 0 END AS agreement_media_complete, CASE WHEN (EXISTS (SELECT 1 FROM registration_documents d WHERE d.registration_id = r.id AND d.document_type = 'player_agreement' AND d.status IN ('generated', 'viewed')) OR LOWER(COALESCE(r.agreement_status, '')) IN ('complete', 'completed', 'signed', 'generated', 'viewed')) THEN 1 ELSE 0 END AS agreement_plyr_complete FROM registrations r LEFT JOIN registration_participants p ON p.registration_id = r.id WHERE " + where.join(" AND ") + " GROUP BY r.id ORDER BY r.created_at DESC LIMIT ?",
   ).bind(...values, limit).all();
+  const registrants = (rows.results || []).map((row) => {
+    const agreementLpafComplete = Number(row.agreement_lpaf_complete) === 1;
+    const agreementMediaComplete = Number(row.agreement_media_complete) === 1;
+    const agreementPlyrComplete = Number(row.agreement_plyr_complete) === 1;
+    return {
+      ...row,
+      agreement_lpaf_complete: agreementLpafComplete,
+      agreement_media_complete: agreementMediaComplete,
+      agreement_plyr_complete: agreementPlyrComplete,
+      agreements_received: [agreementLpafComplete, agreementMediaComplete, agreementPlyrComplete].filter(Boolean).length,
+    };
+  });
   const counts = await env.DB.prepare(
     "SELECT status, COUNT(*) AS count FROM registrations WHERE program_id = ? GROUP BY status ORDER BY status",
   ).bind(programId).all();
-  return json({ ok: true, registrants: rows.results || [], counts: counts.results || [], viewer: context.user });
+  return json({ ok: true, registrants, counts: counts.results || [], viewer: context.user });
 }
 
 async function importRegistrants(request, env, context) {

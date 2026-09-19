@@ -71,6 +71,32 @@ function normalizeRow(row) {
   if (submissionId && !values.registration_submission_id) {
     values.registration_submission_id = submissionId;
   }
+  const scholarshipRequested = first(
+    values,
+    "scholarship_requested",
+    "Scholarship Requested",
+    "scholarshipRequested",
+    "Scholarship",
+  );
+  if (scholarshipRequested && !values.scholarship_requested) {
+    values.scholarship_requested = scholarshipRequested;
+  }
+  const lpafStatus = first(
+    values,
+    "agree_ppf_liability",
+    "PPF Liability Status",
+    "ppf_liability_status",
+  ).toLowerCase();
+  const lpafFile = first(
+    values,
+    "PPF Liability File ID",
+    "PPF Liability PDF URL",
+    "ppf_liability_file_id",
+    "ppf_liability_pdf_url",
+  );
+  if (!values.agree_ppf_liability && (lpafFile || /yes|true|signed|complete|generated|viewed/.test(lpafStatus))) {
+    values.agree_ppf_liability = "yes";
+  }
   if (!values.form_type) values.form_type = "mls_registration";
   return { values, submissionId };
 }

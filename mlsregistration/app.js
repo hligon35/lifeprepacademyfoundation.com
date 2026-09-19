@@ -3667,6 +3667,7 @@
       player_count: String(data.players.length),
       scholarship_requested: String(data.scholarship?.requested || "No"),
       help_choice: data.helpChoice,
+      agree_ppf_liability: data.agreements.liability ? "yes" : "no",
       agree_waiver: data.agreements.waiver ? "yes" : "no",
       agree_privacy: data.agreements.privacy ? "yes" : "no",
       agree_marketing: data.agreements.marketing ? "yes" : "no",

@@ -47,6 +47,44 @@
     return Number.isNaN(parsed.getTime()) ? String(value) : parsed.toLocaleDateString([], { dateStyle: "medium" });
   };
 
+  const formatRegistrantPlayers = (value) => {
+    const players = String(value || "")
+      .split("||")
+      .map((name) => name.trim())
+      .filter(Boolean);
+    return players.length ? players : ["—"];
+  };
+
+  const renderRegistrantPlayers = (value) => {
+    const players = formatRegistrantPlayers(value);
+    return '<div class="registrant-players" title="' + esc(players.join(", ")) + '" aria-label="' + esc(players.join(", ")) + '">' +
+      players.map((name) => '<div class="registrant-player">' + esc(name) + '</div>').join("") +
+      '</div>';
+  };
+
+  const renderScholarship = (row) => {
+    const requested = Number(row.scholarship_requested) === 1 || row.status === "scholarship_pending";
+    return requested
+      ? '<span class="pill pill-scholarship">Requested</span>'
+      : '<span class="muted">—</span>';
+  };
+
+  const renderAgreementState = (label, complete) =>
+    '<div class="registrant-agreement-row" title="' + esc(label + (complete ? " complete" : " missing")) + '">' +
+      '<span class="agreement-indicator ' + (complete ? "agreement-indicator-complete" : "agreement-indicator-missing") + '" aria-hidden="true"></span>' +
+      '<span>' + esc(label) + '</span>' +
+    '</div>';
+
+  const renderAgreements = (row) => {
+    const received = Number(row.agreements_received) || 0;
+    return '<div class="registrant-agreements" aria-label="' + received + ' of 3 agreements received">' +
+      renderAgreementState("LPAF", row.agreement_lpaf_complete) +
+      renderAgreementState("MEDIA", row.agreement_media_complete) +
+      renderAgreementState("PLYR", row.agreement_plyr_complete) +
+      '<div class="registrant-agreement-count">' + received + '/3 received</div>' +
+      '</div>';
+  };
+
   const showNotice = (message) => {
     const node = $("#notice");
     if (!node) return;
@@ -238,8 +276,8 @@
       list.innerHTML = empty("No registrants found", "Try another status or search term.");
       return;
     }
-    list.innerHTML = '<div class="table-wrap"><table class="data-table"><thead><tr><th>Family</th><th>Player(s)</th><th>Status</th><th>Payment</th><th>Agreement</th><th>Submitted</th></tr></thead><tbody>' +
-      state.registrants.map((row) => "<tr><td><strong>" + esc((row.parent_first_name || "") + " " + (row.parent_last_name || "")) + "</strong><br><span class=\"muted\">" + esc(row.parent_email) + "</span></td><td>" + esc(row.participant_names || "—") + "</td><td>" + esc(row.status) + "</td><td>" + esc(row.payment_status || "unpaid") + "</td><td>" + esc(row.agreement_status || "pending") + "</td><td>" + esc(formatDate(row.submitted_at || row.created_at)) + "</td></tr>").join("") +
+    list.innerHTML = '<div class="table-wrap"><table class="data-table"><thead><tr><th>Family</th><th>Player(s)</th><th>Scholarship</th><th>Status</th><th>Payment</th><th>Agreement</th><th>Submitted</th></tr></thead><tbody>' +
+      state.registrants.map((row) => "<tr><td><strong>" + esc(((row.parent_first_name || "") + " " + (row.parent_last_name || "")).trim() || "—") + "</strong><br><span class=\"muted\">" + esc(row.parent_email || "") + "</span></td><td>" + renderRegistrantPlayers(row.participant_names) + "</td><td>" + renderScholarship(row) + "</td><td>" + esc(row.status) + "</td><td>" + esc(row.payment_status || "unpaid") + "</td><td>" + renderAgreements(row) + "</td><td>" + esc(formatDate(row.submitted_at || row.created_at)) + "</td></tr>").join("") +
       "</tbody></table></div>";
   }
 
