@@ -1,19 +1,83 @@
 (() => {
-  const params = new URLSearchParams(window.location.search);
-  const role = (params.get("role") || window.location.pathname.split("/").filter(Boolean).pop() || "parent").toLowerCase();
-  const roleLabels = { parent: "Player / Parent", coach: "Coach", volunteer: "Volunteer" };
-  const copy = {
-    parent: "Your registration status, team information, schedule, and program updates will appear here.",
-    coach: "Your assigned roster, schedule, uniform information, and coach resources will appear here.",
-    volunteer: "Your volunteer assignments, schedule, forms, and program updates will appear here.",
-  };
-  document.querySelector("#pgs-role-label").textContent = roleLabels[role] || roleLabels.parent;
-  document.querySelector("#pgs-dashboard-copy").textContent = copy[role] || copy.parent;
-  document.querySelector("#pgs-greeting").textContent = `Welcome to Paducah GO Soccer`;
-  document.querySelector("#pgs-participants").textContent = "Coming soon";
-  document.querySelector("#pgs-registration-status").textContent = "Ready";
-  document.querySelector("#pgs-logout")?.addEventListener("click", () => { window.location.href = `/cdn-cgi/access/logout?returnTo=${encodeURIComponent(window.location.origin)}`; });
-  const status = document.querySelector("#pgs-status");
-  status.textContent = "Program app";
-  status.className = "status-pill status-pill--active";
+  "use strict";
+  const roles = { guardian:"Parent / Guardian", player:"Player", coach:"Coach", volunteer:"Volunteer", staff:"Program Administrator" };
+  const icons = { home:"⌂", family:"⌂", schedule:"▦", team:"♟", messages:"✉", shop:"▱", contact:"◎", admin:"⚙" };
+  const routes = [
+    ["/","Paducah GO Soccer","home","public"],["/season","Upcoming Season","season","public"],["/register","Register","register","public"],["/schedule","Schedule","schedule","public"],["/shop","Shop","shop","public"],["/contact","Contact","contact","public"],["/about","About","about","public"],["/faq","FAQ","faq","public"],
+    ["/dashboard","Dashboard","dashboard","auth"],["/profile","Profile","profile","auth"],["/notifications","Notifications","notifications","auth"],["/messages","Messages","messages","auth"],["/programs","Switch Program","programs","auth"],
+    ["/family","Family","family","guardian"],["/family/children","Children","family","guardian"],["/family/registrations","Registrations","family","guardian"],["/family/payments","Payments","family","guardian"],["/family/documents","Documents","family","guardian"],["/family/schedule","Family Schedule","family","guardian"],["/family/orders","Orders","family","guardian"],["/family/messages","Family Messages","messages","guardian"],
+    ["/player","Player Home","player","player"],["/player/team","My Team","player","player"],["/player/schedule","Player Schedule","player","player"],["/player/announcements","Announcements","messages","player"],
+    ["/coach","Coach Home","coach","coach"],["/coach/teams","My Teams","coach","coach"],["/coach/teams/:teamId","Team","coach","coach"],["/coach/teams/:teamId/roster","Roster","coach","coach"],["/coach/teams/:teamId/schedule","Team Schedule","coach","coach"],["/coach/teams/:teamId/messages","Team Messages","messages","coach"],
+    ["/volunteer","Volunteer Home","volunteer","volunteer"],["/volunteer/assignments","Assignments","volunteer","volunteer"],["/volunteer/schedule","Volunteer Schedule","volunteer","volunteer"],["/volunteer/messages","Volunteer Messages","messages","volunteer"],
+    ["/program-admin","Program Admin","admin","staff"],["/program-admin/registrations","Registrations","admin","staff"],["/program-admin/players","Players","admin","staff"],["/program-admin/teams","Teams","admin","staff"],["/program-admin/coaches","Coaches","admin","staff"],["/program-admin/volunteers","Volunteers","admin","staff"],["/program-admin/schedule","Schedule","admin","staff"],["/program-admin/announcements","Announcements","admin","staff"],["/program-admin/messages","Messages","messages","staff"],["/program-admin/settings","Settings","admin","staff"]
+  ];
+  const nav = [["/dashboard","Dashboard","home","auth"],["/family","Family","family","guardian"],["/schedule","Schedule","schedule","public"],["/coach","My Teams","team","coach"],["/volunteer","Volunteer","✦","volunteer"],["/messages","Messages","messages","auth"],["/shop","Shop","shop","public"],["/contact","Contact","contact","public"],["/program-admin","Manage Program","admin","staff"]];
+  const state = { session:null, role:new URLSearchParams(location.search).get("role") || "guardian", route:null };
+  const $ = (s) => document.querySelector(s);
+  const esc = (v) => String(v == null ? "" : v).replace(/[&<>"']/g, (c) => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;" }[c]));
+  const route = (path) => routes.find((r) => r[0] === path) || routes.find((r) => r[0].split("/").length === path.split("/").length && r[0].split("/").every((x,i) => x.startsWith(":") || x === path.split("/")[i]));
+  const href = (path,label,cls) => '<a class="button ' + (cls || "") + '" href="' + path + '">' + esc(label) + "</a>";
+  const card = (title,text,action,cls) => '<section class="card ' + (cls || "third") + '"><h3>' + esc(title) + "</h3><p>" + esc(text) + "</p>" + (action || "") + "</section>";
+  const head = (eyebrow,title,desc,action) => '<div class="page-head"><div><p class="eyebrow">' + esc(eyebrow) + "</p><h1>" + esc(title) + "</h1><p>" + esc(desc) + "</p></div>" + (action || "") + "</div>";
+  const rolesFor = () => Array.isArray(state.session?.roles) && state.session.roles.length ? state.session.roles : [state.role];
+  const allowed = (required) => !required || required === "public" || (required === "auth" && state.session) || rolesFor().includes(required) || rolesFor().includes("staff");
+  const page = () => location.pathname.replace(/\/+$/,"") || "/";
+  const link = (path,label,icon,current) => '<a class="nav-link" href="' + path + '"' + (current ? ' aria-current="page"' : "") + '><span class="nav-icon">' + icon + "</span><span>" + esc(label) + "</span></a>";
+  function renderNav() {
+    const items = nav.filter((n) => n[3] === "public" || (state.session && (n[3] === "auth" || rolesFor().includes(n[3]) || rolesFor().includes("staff"))));
+    const current = page();
+    $("#side-nav").innerHTML = items.map((n) => link(n[0],n[1],icons[n[2]] || n[2],current === n[0] || current.startsWith(n[0] + "/"))).join("");
+    $("#mobile-nav").innerHTML = items.slice(0,5).map((n) => link(n[0],n[1],icons[n[2]] || n[2],current === n[0] || current.startsWith(n[0] + "/"))).join("");
+  }
+  function renderCrumbs() {
+    $("#crumbs").innerHTML = '<a href="/">Paducah GO</a> <span>/</span> ' + esc(state.route ? state.route[1] : "Page");
+  }
+  function empty(title,text,action) { return '<div class="empty"><h2>' + esc(title) + "</h2><p>" + esc(text) + "</p>" + (action || "") + "</div>"; }
+  function generic(title,desc,items) { return head("Paducah GO Soccer",title,desc) + '<div class="grid">' + items.map((i) => card(i[0],i[1],i[2],i[3])).join("") + "</div>"; }
+  function renderHome() {
+    $("#view").innerHTML = head("Paducah GO Soccer","A better way to stay connected to the season.","Registration, schedules, teams, communication, and program updates in one place.",state.session ? href("/dashboard","Open dashboard","gold") : href("/register","Register for the season","gold")) +
+      '<div class="grid"><section class="card hero"><p class="eyebrow">Upcoming season</p><h2>Every player, family, coach, and volunteer has a place here.</h2><p>Get season information, complete registration, view schedules, and stay connected with Paducah GO Soccer.</p><div class="actions">' + href("/season","View season","gold") + href("/schedule","View schedule","outline") + "</div></section>" +
+      card("Registration","Start a new registration or securely continue an existing one.",href("/register","Open registration","quiet"),"side") +
+      card("Next events","Published games, practices, clinics, and important dates will appear here.",href("/schedule","View schedule","outline")) +
+      card("Announcements","Program announcements will appear here as they are posted.",href("/messages","Open messages","outline")) +
+      card("Shop Paducah GO","Browse jerseys, kits, and other program merchandise.",href("/shop","Visit the shop","outline")) + "</div>";
+  }
+  function renderDashboard() {
+    const name = state.session?.displayName || state.session?.email || "there";
+    $("#view").innerHTML = head("Paducah GO dashboard","Welcome, " + name + ".","Your season information and role-specific workspaces are collected here.",href("/schedule","View schedule","quiet")) +
+      '<div class="grid"><section class="card hero"><p class="eyebrow">Upcoming season</p><h2>Keep your season moving.</h2><p>Registration, next events, team information, and program communication will be available from your dashboard.</p><div class="actions">' + href("/family","Open workspace","gold") + href("/programs","Switch program","outline") + "</div></section>" +
+      card("Registration status","Your current registration, payment, and document status will appear here.",href("/family/registrations","View registrations","quiet"),"side") +
+      card("Next event","Published practices and games will appear here.","<strong class='stat'>Coming soon</strong>") +
+      card("Messages","Program and team communication will appear here.",href("/messages","Open messages","outline")) +
+      card("Current program","Paducah GO Soccer",href("/programs","Switch program","outline")) + "</div>";
+  }
+  function renderRoute() {
+    const v = state.route[2];
+    if (v === "home") return renderHome();
+    if (v === "dashboard") return renderDashboard();
+    if (v === "season") return $("#view").innerHTML = generic("Upcoming season","Season dates, registration information, and program details will be published here.",[["Season overview","The current season configuration will appear here when published.",href("/register","Register","gold"),"half"],["Important dates","Draft events, deadlines, practices, games, and clinics will appear here.",href("/schedule","View schedule","quiet"),"half"]]);
+    if (v === "schedule") return $("#view").innerHTML = head("Paducah GO Soccer","Schedule","View public events or sign in to see schedules connected to your family, team, or volunteer assignments.",state.session ? href("/family/schedule","My schedule","quiet") : href("/register","Register","gold")) + '<div class="grid"><section class="card full">' + empty("Schedule coming soon","Published Paducah GO games, practices, clinics, and important dates will appear here.") + "</section></div>";
+    if (v === "shop") return $("#view").innerHTML = head("Paducah GO Soccer","Shop","Browse Paducah GO merchandise and view your order history after signing in.",state.session ? href("/family/orders","My orders","quiet") : "") + '<div class="grid"><section class="card full">' + empty("Shop coming soon","Products and Square checkout will appear here when merchandise is published.") + "</section></div>";
+    if (v === "contact") return renderContact();
+    if (v === "register") return $("#view").innerHTML = generic("Registration","Registration is handled through the secure Paducah GO registration workflow.",[["Open registration","Use the registration form to begin or continue an application.",href("/register","Start registration","gold"),"full"]]);
+    if (v === "programs") return $("#view").innerHTML = generic("Switch program","Move between LifePrep youth programs without creating another account.",[["LifePrep program hub","Open the shared program hub to select another program.",href("https://app.lifeprepacademyfoundation.com/programs","Open program hub","gold"),"full"]]);
+    if (v === "profile") return $("#view").innerHTML = generic("Profile","Your account and program membership information will appear here.",[["Account",state.session?.email || "Sign in to view your account.","","half"],["Role",roles[state.role] || "Program member","","half"]]);
+    if (v === "notifications") return $("#view").innerHTML = generic("Notifications","Program reminders and important updates will appear here.",[["No new notifications","You are caught up for now.","","full"]]);
+    if (v === "messages") return $("#view").innerHTML = generic("Messages","Program and team communication will appear here.",[["No messages yet","New program and team communication will appear here.","","full"]]);
+    if (v === "family") return $("#view").innerHTML = generic("Family workspace","Manage children, registrations, payments, documents, schedules, and orders.",[["Children","Connected children and team information will appear here.",href("/family/children","View children","quiet"),"half"],["Registrations","Review registration, payment, scholarship, and document status.",href("/family/registrations","View registrations","quiet"),"half"],["Family schedule","See events for all connected children.",href("/family/schedule","View schedule","quiet"),"half"],["Orders","View merchandise orders and payment status.",href("/family/orders","View orders","quiet"),"half"]);
+    if (v === "player") return $("#view").innerHTML = generic("Player workspace","View your team, schedule, and program announcements.",[["My team","Your assigned team and coach information will appear here.",href("/player/team","Open team","quiet"),"half"],["Schedule","Your practices and games will appear here.",href("/player/schedule","View schedule","quiet"),"half"],["Announcements","Team and program announcements will appear here.","","half"]]);
+    if (v === "coach") return $("#view").innerHTML = generic("Coach workspace","Manage assigned teams, rosters, schedules, and team communication.",[["My teams","Assigned teams will appear here.",href("/coach/teams","View teams","quiet"),"half"],["Roster","Authorized team roster information will appear here.","","half"],["Schedule","Practices and games for assigned teams will appear here.",href("/coach/teams","View team schedules","quiet"),"half"]]);
+    if (v === "volunteer") return $("#view").innerHTML = generic("Volunteer workspace","View volunteer assignments, events, and announcements.",[["Assignments","Your assigned duties will appear here.",href("/volunteer/assignments","View assignments","quiet"),"half"],["Schedule","Volunteer-related events will appear here.",href("/volunteer/schedule","View schedule","quiet"),"half"],["Announcements","Volunteer announcements will appear here.","","half"]]);
+    if (v === "admin") return $("#view").innerHTML = generic("Program administration","Manage Paducah GO operations according to your program permissions.",[["Registrations","Review program registrations.",href("/program-admin/registrations","Open registrations","quiet"),"half"],["Teams","Manage teams and assignments.",href("/program-admin/teams","Open teams","quiet"),"half"],["Schedule","Manage program events.",href("/program-admin/schedule","Open schedule","quiet"),"half"],["Announcements","Publish program updates.",href("/program-admin/announcements","Open announcements","quiet"),"half"]);
+    return $("#view").innerHTML = generic(state.route[1],"This Paducah GO workspace is ready for its connected data and operations.",[["Coming soon","The selected page is available in the route structure and will be connected to its D1-backed operation.",href("/dashboard","Return to dashboard","quiet"),"full"]]);
+  }
+  function renderContact() {
+    $("#view").innerHTML = head("Paducah GO Soccer","Contact","Send a question to Paducah GO administration. Do not include sensitive payment or medical information.",state.session ? href("/messages","Open messages","quiet") : "") + '<section class="card form"><h2>Contact Paducah GO</h2><form id="contact-form"><label>Name</label><input name="name" required><label>Email</label><input name="email" type="email" required><label>Subject</label><input name="subject" required><label>Message</label><textarea name="message" required></textarea><button class="button" type="submit">Send message</button><p id="contact-status" role="status"></p></form></section>';
+    $("#contact-form").addEventListener("submit", async (e) => { e.preventDefault(); const f=e.currentTarget,s=$("#contact-status"),d=new FormData(f); s.textContent="Sending..."; const r=await fetch("/api/site-submissions",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({formType:"contact",name:d.get("name"),email:d.get("email"),subject:d.get("subject"),message:d.get("message"),pageUrl:location.href})}); s.textContent=r.ok?"Your message was sent.":"We could not send your message."; if(r.ok)f.reset(); });
+  }
+  async function session() { const r=await fetch("/api/auth/session",{credentials:"include"}).catch(()=>null); if(!r || !r.ok)return null; const d=await r.json().catch(()=>null); return d?.ok?d:null; }
+  function login() { $("#view").innerHTML=head("Sign in required","Continue to Paducah GO","Enter your email to receive a secure sign-in link. Staff should use the LifePrep administration login.","")+'<section class="card form"><form id="login-form"><label>Email address</label><input name="email" type="email" required autocomplete="email"><button class="button" type="submit">Email me a sign-in link</button><p id="login-status" role="status"></p></form><div class="actions">'+href("https://lifeprepacademyfoundation.com/admin","Staff administration login","outline")+"</div></section>"; $("#login-form").addEventListener("submit",async(e)=>{e.preventDefault();const s=$("#login-status"),email=new FormData(e.currentTarget).get("email");s.textContent="Sending sign-in link...";const r=await fetch("/api/auth/request-link",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email})});s.textContent=r.ok?"Check your email for a secure sign-in link.":"We could not send the sign-in link.";});}
+  async function handoff() { const p=new URLSearchParams(location.search),code=p.get("code"); if(!code)return false; const r=await fetch("/api/auth/handoff/redeem",{method:"POST",headers:{"Content-Type":"application/json"},credentials:"include",body:JSON.stringify({code})}); if(!r.ok)return false; const to=p.get("returnTo"); location.replace(to && to.startsWith("/") ? to : "/dashboard"); return true; }
+  async function init() { if(location.pathname==="/auth/handoff" && await handoff())return; state.route=route(page()) || routes[0]; state.session=await session(); renderNav(); renderCrumbs(); if(state.route[3]==="auth" && !state.session)return login(); if(state.route[3]!=="public" && state.route[3]!=="auth" && !allowed(state.route[3]))return $("#view").innerHTML='<div class="error"><h2>Access not available</h2><p>Your account does not have permission to view this Paducah GO page.</p>'+href("/dashboard","Return to dashboard","quiet")+"</div>"; renderRoute(); }
+  document.addEventListener("click",(e)=>{const a=e.target.closest("a[href]");if(!a)return;const h=a.getAttribute("href");if(!h || !h.startsWith("/") || h.startsWith("//"))return;e.preventDefault();history.pushState({}, "", h);init();}); window.addEventListener("popstate",init); $("#notification-btn").onclick=()=>location.href="/notifications"; $("#profile-btn").onclick=()=>location.href=state.session?"/profile":"/dashboard"; init();
 })();
