@@ -31,7 +31,9 @@ import {
 import {
   requestMagicLink,
   verifyMagicLink,
+  getSessionUser,
   createHandoffCode,
+  createHandoffCodeForUser,
   redeemHandoffCode,
 } from "./auth-magic-link.js";
 import { adminError, getAdminContext } from "./admin-auth.js";
@@ -151,20 +153,16 @@ export default {
     const url = new URL(request.url);
 
     if (isPgsHost(url.hostname)) {
-      if (url.pathname === "/" || url.pathname === "/index.html") {
+      if (url.pathname === "/auth/handoff" && request.method === "GET") {
+        return handleAuthHandoffGet(request, env);
+      }
+      if (url.pathname === "/register" || url.pathname === "/register/") {
+        return handleAdminAssetPage(request, env, "/index.html");
+      }
+      // The Paducah GO hostname is a route-driven application shell. Static assets
+      // continue through ASSETS; every application path resolves to the shell.
+      if (!url.pathname.startsWith("/api/") && !/\\.[a-z0-9]+$/i.test(url.pathname)) {
         return handleAdminAssetPage(request, env, "/admin/programs/pgs/index.html");
-      }
-      if (url.pathname === "/parent" || url.pathname === "/parent/") {
-        return handleAdminAssetPage(request, env, "/admin/programs/pgs/index.html", "parent");
-      }
-      if (url.pathname === "/coach" || url.pathname === "/coach/") {
-        return handleAdminAssetPage(request, env, "/admin/programs/pgs/index.html", "coach");
-      }
-      if (url.pathname === "/volunteer" || url.pathname === "/volunteer/") {
-        return handleAdminAssetPage(request, env, "/admin/programs/pgs/index.html", "volunteer");
-      }
-      if (["/schedule", "/team-roster", "/uniform-re-order", "/merch", "/contact"].includes(url.pathname)) {
-        return handleAdminAssetPage(request, env, "/admin/programs/pgs/index.html", "parent");
       }
     }
 
@@ -371,6 +369,12 @@ export default {
     if (url.pathname === "/api/auth/verify" && request.method === "GET") {
       return handleAuthVerify(request, env);
     }
+    if (url.pathname === "/api/auth/session" && request.method === "GET") {
+      return handleAuthSession(request, env);
+    }
+    if (url.pathname === "/api/auth/access-exchange" && request.method === "POST") {
+      return handleAuthAccessExchange(request, env);
+    }
     if (url.pathname === "/api/auth/handoff/create" && request.method === "POST") {
       return handleAuthHandoffCreate(request, env);
     }
@@ -465,6 +469,65 @@ async function handleAuthHandoffCreate(request, env) {
   });
   if (!code) return json({ ok: false, error: "not_authenticated" }, 401, request, env);
   return json({ ok: true, code }, 200, request, env);
+}
+
+
+async function handleAuthSession(request, env) {
+  const sessionUser = await getSessionUser(env, getCookie(request, "session"));
+  if (!sessionUser) return json({ ok: false, error: "authentication_required" }, 401, request, env);
+  const memberships = await env.DB.prepare(
+    "SELECT program_id AS programId, role, status FROM program_memberships WHERE user_id = ? AND status = 'active' ORDER BY program_id, role",
+  ).bind(sessionUser.id).all();
+  return json({
+    ok: true,
+    user: sessionUser,
+    roles: (memberships.results || []).map((item) => item.role),
+    memberships: memberships.results || [],
+  }, 200, request, env);
+}
+
+async function handleAuthAccessExchange(request, env) {
+  const context = await getAdminContext(request, env);
+  if (!context.ok) return adminError(context);
+  const payload = await request.json().catch(() => ({}));
+  const targetHost = String(payload?.targetHost || "").trim().toLowerCase();
+  const allowedTargets = new Set([
+    "app.lifeprepacademyfoundation.com",
+    "paducahgo.lifeprepacademyfoundation.com",
+    "pnffl.lifeprepacademyfoundation.com",
+    "pnffc.lifeprepacademyfoundation.com",
+  ]);
+  if (!allowedTargets.has(targetHost)) return json({ ok: false, error: "invalid_target_host" }, 400, request, env);
+
+  const email = String(context.identity.email || "").trim().toLowerCase();
+  let user = await env.DB.prepare("SELECT id FROM users WHERE LOWER(email) = ? LIMIT 1").bind(email).first();
+  if (!user) {
+    const userId = crypto.randomUUID();
+    await env.DB.prepare(
+      "INSERT INTO users (id, email, display_name) VALUES (?, ?, ?) ON CONFLICT(email) DO NOTHING",
+    ).bind(userId, email, context.identity.name || email).run();
+    user = await env.DB.prepare("SELECT id FROM users WHERE LOWER(email) = ? LIMIT 1").bind(email).first();
+  }
+  if (!user) return json({ ok: false, error: "application_user_unavailable" }, 503, request, env);
+
+  const code = await createHandoffCodeForUser(env, {
+    userId: user.id,
+    sourceHost: new URL(request.url).hostname,
+    targetHost,
+  });
+  if (!code) return json({ ok: false, error: "handoff_unavailable" }, 503, request, env);
+  return json({ ok: true, code }, 200, request, env);
+}
+
+async function handleAuthHandoffGet(request, env) {
+  const url = new URL(request.url);
+  const result = await redeemHandoffCode(env, { code: url.searchParams.get("code"), targetHost: url.hostname });
+  if (!result.ok) return new Response("This sign-in handoff is invalid or expired.", { status: 401 });
+  const returnTo = String(url.searchParams.get("returnTo") || "/dashboard");
+  const safeReturnTo = returnTo.startsWith("/") && !returnTo.startsWith("//") ? returnTo : "/dashboard";
+  const headers = new Headers({ Location: safeReturnTo, "Cache-Control": "no-store" });
+  headers.append("Set-Cookie", "session=" + encodeURIComponent(result.sessionToken) + "; Path=/; Secure; HttpOnly; SameSite=Lax; Expires=" + new Date(result.expiresAt).toUTCString());
+  return new Response(null, { status: 302, headers });
 }
 
 async function handleAuthHandoffRedeem(request, env) {
