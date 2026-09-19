@@ -3,3 +3,5 @@
 @media(max-width:980px){.metric-grid{grid-template-columns:repeat(3,1fr)}.span-8,.span-6,.span-4{grid-column:span 12}}
 @media(max-width:720px){.topbar{align-items:flex-start;flex-direction:column}.account{width:100%;justify-content:space-between}.shell{display:block}.sidebar{width:100%;padding:14px 12px;border-right:0;border-bottom:1px solid var(--line)}.sidebar nav{display:flex;overflow:auto}.nav-item{width:auto;white-space:nowrap}.sidebar-foot{display:flex;margin-top:0;padding:4px 10px}.page-head,.section-head{align-items:flex-start;flex-direction:column}.metric-grid{grid-template-columns:repeat(2,1fr)}.form-grid{grid-template-columns:1fr}.field.full{grid-column:auto}.announcement{grid-template-columns:1fr}.announcement-side{text-align:left}.assignment{align-items:flex-start;flex-direction:column}}
 @media(max-width:460px){.metric-grid{grid-template-columns:1fr}.main{padding:20px 14px}.brand img{width:40px;height:40px}}
+
+.result-entry{display:flex;align-items:center;gap:6px;margin-top:8px}.result-entry .form-control{width:58px;min-width:0;padding:6px}.result-entry .button{min-height:32px;padding:6px 9px;font-size:.75rem}
