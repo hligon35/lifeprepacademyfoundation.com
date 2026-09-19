@@ -59,6 +59,16 @@ function canAccessTeam(context, programId, teamId) {
   );
 }
 
+function canRecordGameResult(context, programId, teamId) {
+  if (canManageProgram(context, programId)) return true;
+  return (context.assignments || []).some((assignment) =>
+    assignment.program_id === programId &&
+    assignment.team_id === teamId &&
+    assignment.status === "active" &&
+    assignment.role_id === "coach",
+  );
+}
+
 function denied(message = "Operations access denied") {
   return json({ ok: false, error: message }, 403);
 }
@@ -454,7 +464,7 @@ async function recordGameResult(request, env, context, versionId, gameId) {
     "SELECT sg.*, sv.status AS version_status FROM schedule_games sg JOIN schedule_versions sv ON sv.id = sg.version_id WHERE sg.id = ? AND sg.version_id = ? LIMIT 1",
   ).bind(gameId, versionId).first();
   if (!game) return json({ ok: false, error: "Game not found" }, 404);
-  if (!canAccessTeam(context, game.program_id, game.home_team_id) && !canAccessTeam(context, game.program_id, game.away_team_id)) return denied("Game result access denied");
+  if (!canRecordGameResult(context, game.program_id, game.home_team_id) && !canRecordGameResult(context, game.program_id, game.away_team_id)) return denied("Game result access denied");
   const payload = await request.json().catch(() => null);
   const homeScore = Math.max(0, Number(payload?.homeScore || 0));
   const awayScore = Math.max(0, Number(payload?.awayScore || 0));
