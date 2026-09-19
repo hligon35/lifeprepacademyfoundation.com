@@ -157,7 +157,7 @@ async function getAdminContext(request, env, options = {}) {
      WHERE aup.admin_user_id = ?`,
   ).bind(user.id).all();
   const isSuperAdmin = Boolean(isBootstrapAdmin) || (roles.results || []).some((role) => role.id === "super_admin");
-  const programs = await env.DB.prepare(
+  let programs = await env.DB.prepare(
     isSuperAdmin
       ? "SELECT id, name, status FROM programs ORDER BY CASE WHEN status = 'active' THEN 0 ELSE 1 END, name"
       : `SELECT DISTINCT p.id, p.name, p.status
@@ -183,6 +183,21 @@ async function getAdminContext(request, env, options = {}) {
     // The assignment table is introduced by the Phase One migration. Keep the
     // existing admin session usable while an older preview database is migrating.
     console.warn("admin-assignments-read-skipped", error);
+  }
+
+  if (!isSuperAdmin && assignments.length) {
+    const existingPrograms = new Map((programs.results || []).map((program) => [program.id, program]));
+    const assignmentProgramIds = [...new Set(assignments.map((assignment) => assignment.program_id))];
+    try {
+      const placeholders = assignmentProgramIds.map(() => "?").join(", ");
+      const assignmentPrograms = await env.DB.prepare(
+        "SELECT id, name, status FROM programs WHERE id IN (" + placeholders + ") ORDER BY name",
+      ).bind(...assignmentProgramIds).all();
+      (assignmentPrograms.results || []).forEach((program) => existingPrograms.set(program.id, program));
+      programs = { results: [...existingPrograms.values()] };
+    } catch (error) {
+      console.warn("assignment-programs-read-skipped", error);
+    }
   }
 
   return {
