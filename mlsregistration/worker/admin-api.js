@@ -774,3 +774,5 @@ async function handleAdminApi(request, env) {
     return json({ ok: false, error: "Admin request failed" }, 500);
   }
 }
+
+export { handleAdminApi };
