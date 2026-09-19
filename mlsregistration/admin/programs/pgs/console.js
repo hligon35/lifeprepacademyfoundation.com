@@ -399,6 +399,237 @@
       "</div></section>";
   }
 
+
+
+  const operationsQuery = () =>
+    "programId=" + encodeURIComponent(PROGRAM_ID) + "&seasonId=" + encodeURIComponent(state.seasonId || "");
+
+  async function loadOperations() {
+    state.operations = await api("/api/admin/operations?" + operationsQuery());
+  }
+
+  async function loadRosters() {
+    const payload = await api("/api/admin/rosters?" + operationsQuery());
+    state.rosters = payload.generations || [];
+    state.rosterTeams = payload.teams || [];
+  }
+
+  function rosterGenerationRow(item) {
+    return '<div class="activity"><div><strong>' + esc(item.status) + ' roster recommendation</strong><div class="activity-meta">' +
+      esc(item.team_count) + " teams · " + esc(item.target_team_size) + " players per team · " + esc(formatDate(item.created_at)) +
+      '</div></div><div class="actions"><button class="button button-quiet" data-roster-view="' + esc(item.id) + '" type="button">Review</button>' +
+      (item.status === "draft" && canManageTeams() ? '<button class="button button-gold" data-roster-publish="' + esc(item.id) + '" type="button">Publish</button>' : "") +
+      (item.status === "published" && canManageProgram() ? '<button class="button button-danger" data-roster-lock="' + esc(item.id) + '" type="button">Lock</button>' : "") +
+      "</div></div>";
+  }
+
+  async function loadRosterDetails(generationId) {
+    const payload = await api("/api/admin/rosters/" + encodeURIComponent(generationId));
+    const groups = {};
+    (payload.assignments || []).forEach((assignment) => {
+      const key = assignment.team_id || "unassigned";
+      if (!groups[key]) groups[key] = { name: assignment.team_name || "Unassigned", players: [] };
+      groups[key].players.push(assignment);
+    });
+    const details = $("#roster-details");
+    if (!details) return;
+    details.innerHTML = '<h2>Roster review</h2><p class="muted">Published and locked assignments are retained. Draft recommendations can be reviewed before publishing.</p><div class="grid">' +
+      Object.values(groups).map((group) => '<section class="card span-4"><h3>' + esc(group.name) + '</h3><div class="activity-list">' +
+        group.players.map((player) => '<div class="activity"><strong>' + esc((player.first_name || "") + " " + (player.last_name || "")) + '</strong><div class="activity-meta">' + esc(player.grade_or_age || "Age not provided") + (player.favorite_club ? " · " + esc(player.favorite_club) : "") + '</div></div>').join("") +
+      "</div></section>").join("") + "</div>";
+  }
+
+  async function renderRosters() {
+    await loadRosters();
+    const teams = state.rosterTeams || [];
+    const generations = state.rosters || [];
+    $("#view").innerHTML =
+      pageHead("League operations", "Teams & rosters", "Generate a balanced recommendation from completed registrations, review the placements, then publish and lock the roster when it is ready.", "") +
+      '<div class="grid">' +
+      '<section class="card span-5"><h2>Generate recommendation</h2>' +
+      (canManageTeams() ? '<form id="roster-form" class="form-grid">' +
+        '<div class="field"><label for="roster-format">League format</label><select class="form-control" id="roster-format"><option>5v5</option><option>6v6</option><option selected>7v7</option><option>8v8</option><option>9v9</option><option>10v10</option><option>11v11</option></select></div>' +
+        '<div class="field"><label for="roster-team-count">Team count</label><input class="form-control" id="roster-team-count" type="number" min="1" value="' + esc(Math.max(1, Math.ceil((state.workspace.metrics && state.workspace.metrics.participants || 10) / 10))) + '"></div>' +
+        '<div class="field"><label for="roster-team-size">Target players per team</label><input class="form-control" id="roster-team-size" type="number" min="2" max="30" value="' + esc((state.workspace.seasonSettings && state.workspace.seasonSettings.target_team_size) || 10) + '"></div>' +
+        '<div class="field full"><label for="roster-team-names">Team names (optional, comma-separated)</label><input class="form-control" id="roster-team-names" placeholder="Blue, Gold, United"></div>' +
+        '<div class="field full"><p class="muted">The generator preserves players already assigned to published or locked teams and creates a new draft generation for review.</p><div class="actions">' + button("Generate draft", "generate-roster", "button-gold") + "</div></div></form>"
+      : '<p class="muted">Only league administrators and roster managers can generate team recommendations. Coaches can review their assigned teams after publication.</p>') +
+      "</section>" +
+      '<section class="card span-7"><h2>Current teams</h2>' + (teams.length ? '<div class="table-wrap"><table class="data-table"><thead><tr><th>Team</th><th>Format</th><th>Status</th></tr></thead><tbody>' + teams.map((team) => "<tr><td>" + esc(team.name) + "</td><td>" + esc(team.league_format) + "</td><td>" + esc(team.status) + "</td></tr>").join("") + "</tbody></table></div>" : empty("No teams yet", "Generate a draft recommendation after completed players are available.")) + "</section>" +
+      '<section class="card span-12"><div class="section-head"><h2>Generation history</h2></div><div class="activity-list">' + (generations.length ? generations.map(rosterGenerationRow).join("") : empty("No generation history", "Drafts, published rosters, and locked rosters will appear here.")) + "</div></section>" +
+      '<section class="card span-12" id="roster-details"></section></div>';
+    $("#roster-details").innerHTML = empty("Select a generation", "Use Review to inspect each recommended team before publishing.");
+    $("#roster-form") && ($("#roster-form").onsubmit = async (event) => {
+      event.preventDefault();
+      try {
+        await api("/api/admin/rosters/generate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({
+          programId: PROGRAM_ID,
+          seasonId: state.seasonId,
+          leagueFormat: $("#roster-format").value,
+          teamCount: Number($("#roster-team-count").value),
+          targetTeamSize: Number($("#roster-team-size").value),
+          teamNames: $("#roster-team-names").value
+        })});
+        showNotice("Draft roster recommendation created.");
+        await renderRosters();
+      } catch (error) { showNotice(error.message); }
+    });
+    document.querySelectorAll("[data-roster-view]").forEach((item) => {
+      item.onclick = () => loadRosterDetails(item.dataset.rosterView).catch((error) => showNotice(error.message));
+    });
+    document.querySelectorAll("[data-roster-publish]").forEach((item) => {
+      item.onclick = async () => {
+        if (!window.confirm("Publish this roster recommendation? Existing published or locked teams will be preserved.")) return;
+        try { await api("/api/admin/rosters/" + encodeURIComponent(item.dataset.rosterPublish) + "/publish", { method: "POST" }); showNotice("Roster published."); await loadWorkspace(true); setView("rosters", false); }
+        catch (error) { showNotice(error.message); }
+      };
+    });
+    document.querySelectorAll("[data-roster-lock]").forEach((item) => {
+      item.onclick = async () => {
+        if (!window.confirm("Lock this published roster? Future generator runs will preserve these assignments.")) return;
+        try { await api("/api/admin/rosters/" + encodeURIComponent(item.dataset.rosterLock) + "/lock", { method: "POST" }); showNotice("Roster locked."); await loadWorkspace(true); setView("rosters", false); }
+        catch (error) { showNotice(error.message); }
+      };
+    });
+  }
+
+  async function loadSchedules() {
+    const payload = await api("/api/admin/schedules?" + operationsQuery());
+    state.schedules = payload.versions || [];
+  }
+
+  async function loadScheduleDetails(versionId) {
+    const payload = await api("/api/admin/schedules/" + encodeURIComponent(versionId));
+    const details = $("#schedule-details");
+    if (!details) return;
+    let constraints = {};
+    try { constraints = JSON.parse(payload.version.constraints_json || "{}"); } catch {}
+    details.innerHTML = '<h2>Schedule review</h2><p class="muted">' + esc(payload.version.status) + " · " + esc(payload.games.length) + " games · " + esc(payload.version.games_per_team) + " games per team</p>" +
+      (Array.isArray(constraints.conflicts) && constraints.conflicts.length ? '<div class="notice show">' + esc(constraints.conflicts.join(" ")) + "</div>" : "") +
+      '<div class="table-wrap"><table class="data-table"><thead><tr><th>Round</th><th>Matchup</th><th>Start</th><th>Field</th><th>Result</th></tr></thead><tbody>' +
+      payload.games.map((game) => '<tr><td>' + esc(game.round_number) + '</td><td><strong>' + esc(game.home_team_name) + "</strong> vs " + esc(game.away_team_name) + '</td><td>' + esc(formatDate(game.starts_at)) + '</td><td>' + esc(game.field_name || "—") + '</td><td>' +
+        (game.home_score !== null && game.home_score !== undefined ? esc(game.home_score + " – " + game.away_score) : "") +
+        (canOperateTeam() ? '<div class="result-entry"><input class="form-control" data-home-score="' + esc(game.id) + '" type="number" min="0" placeholder="H"><input class="form-control" data-away-score="' + esc(game.id) + '" type="number" min="0" placeholder="A"><button class="button button-quiet" data-game-result="' + esc(game.id) + '" data-version-id="' + esc(versionId) + '" type="button">Save</button></div>' : "") +
+      "</td></tr>").join("") + "</tbody></table></div>";
+    document.querySelectorAll("[data-game-result]").forEach((item) => {
+      item.onclick = async () => {
+        try {
+          const gameId = item.dataset.gameResult;
+          await api("/api/admin/schedules/" + encodeURIComponent(item.dataset.versionId) + "/games/" + encodeURIComponent(gameId) + "/result", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({
+            homeScore: Number(document.querySelector("[data-home-score='" + gameId + "']").value || 0),
+            awayScore: Number(document.querySelector("[data-away-score='" + gameId + "']").value || 0)
+          })});
+          showNotice("Game result saved.");
+          await loadScheduleDetails(versionId);
+        } catch (error) { showNotice(error.message); }
+      };
+    });
+  }
+
+  async function renderSchedules() {
+    await loadSchedules();
+    $("#view").innerHTML =
+      pageHead("League operations", "Schedules", "Generate a draft round-robin schedule from the published teams, review conflicts, and publish a version when it is ready.", "") +
+      '<div class="grid">' +
+      '<section class="card span-5"><h2>Generate schedule</h2>' +
+      (canManageTeams() ? '<form id="schedule-form" class="form-grid">' +
+        '<div class="field"><label for="games-per-team">Games per team</label><input class="form-control" id="games-per-team" type="number" min="1" max="30" value="' + esc((state.workspace.seasonSettings && state.workspace.seasonSettings.target_games_per_team) || 8) + '"></div>' +
+        '<div class="field"><label for="schedule-dates">Dates</label><input class="form-control" id="schedule-dates" placeholder="2026-10-03, 2026-10-10"></div>' +
+        '<div class="field"><label for="schedule-times">Time slots</label><input class="form-control" id="schedule-times" placeholder="09:00, 10:30"></div>' +
+        '<div class="field"><label for="schedule-fields">Fields</label><input class="form-control" id="schedule-fields" placeholder="Field 1, Field 2"></div>' +
+        '<div class="field full"><p class="muted">Dates, times, and fields are optional for a draft. Conflicts must be resolved before publishing.</p><div class="actions">' + button("Generate draft", "generate-schedule", "button-gold") + "</div></div></form>"
+      : '<p class="muted">Only league administrators and roster managers can generate schedules.</p>') +
+      "</section>" +
+      '<section class="card span-7"><h2>Schedule versions</h2><div class="activity-list">' +
+      (state.schedules.length ? state.schedules.map((version) => '<div class="activity"><div><strong>' + esc(version.status) + " schedule</strong><div class=\"activity-meta\">" + esc(version.games_per_team) + " games per team · " + esc(formatDate(version.created_at)) + "</div></div><div class=\"actions\"><button class=\"button button-quiet\" data-schedule-view=\"" + esc(version.id) + '" type="button">Review</button>' +
+        (version.status === "draft" && canManageProgram() ? '<button class="button button-gold" data-schedule-publish="' + esc(version.id) + '" type="button">Publish</button>' : "") + "</div></div>").join("") : empty("No schedules yet", "Publish teams before generating a schedule.")) +
+      "</div></section>" +
+      '<section class="card span-12" id="schedule-details">' + empty("Select a schedule", "Use Review to inspect matchups, fields, conflicts, and results.") + "</section></div>";
+    $("#schedule-form") && ($("#schedule-form").onsubmit = async (event) => {
+      event.preventDefault();
+      try {
+        await api("/api/admin/schedules/generate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({
+          programId: PROGRAM_ID,
+          seasonId: state.seasonId,
+          gamesPerTeam: Number($("#games-per-team").value),
+          dates: $("#schedule-dates").value,
+          timeSlots: $("#schedule-times").value,
+          fields: $("#schedule-fields").value
+        })});
+        showNotice("Draft schedule created.");
+        await renderSchedules();
+      } catch (error) { showNotice(error.message); }
+    });
+    document.querySelectorAll("[data-schedule-view]").forEach((item) => {
+      item.onclick = () => loadScheduleDetails(item.dataset.scheduleView).catch((error) => showNotice(error.message));
+    });
+    document.querySelectorAll("[data-schedule-publish]").forEach((item) => {
+      item.onclick = async () => {
+        if (!window.confirm("Publish this schedule version? A previous published version will remain in history as archived.")) return;
+        try { await api("/api/admin/schedules/" + encodeURIComponent(item.dataset.schedulePublish) + "/publish", { method: "POST" }); showNotice("Schedule published."); await loadWorkspace(true); setView("schedules", false); }
+        catch (error) { showNotice(error.message); }
+      };
+    });
+  }
+
+  async function loadAttendance() {
+    const teamId = $("#attendance-team") ? $("#attendance-team").value : "";
+    const date = $("#attendance-date") ? $("#attendance-date").value : new Date().toISOString().slice(0, 10);
+    if (!teamId) { $("#attendance-list").innerHTML = empty("Choose a team", "Select an assigned team to load attendance."); return; }
+    try {
+      state.attendance = await api("/api/admin/attendance?programId=" + encodeURIComponent(PROGRAM_ID) + "&seasonId=" + encodeURIComponent(state.seasonId) + "&teamId=" + encodeURIComponent(teamId) + "&date=" + encodeURIComponent(date));
+      const rows = state.attendance.players || [];
+      $("#attendance-list").innerHTML = rows.length ? '<div class="table-wrap"><table class="data-table"><thead><tr><th>Player</th><th>Grade/age</th><th>Attendance</th><th>Note</th></tr></thead><tbody>' + rows.map((player) => "<tr><td>" + esc((player.first_name || "") + " " + (player.last_name || "")) + "</td><td>" + esc(player.grade_or_age || "—") + '</td><td><select class="form-control" data-attendance-status="' + esc(player.participant_id) + '"><option value="present"' + (player.attendance_status === "present" ? " selected" : "") + '>Present</option><option value="absent"' + (player.attendance_status === "absent" ? " selected" : "") + '>Absent</option><option value="late"' + (player.attendance_status === "late" ? " selected" : "") + '>Late</option><option value="excused"' + (player.attendance_status === "excused" ? " selected" : "") + '>Excused</option></select></td><td><input class="form-control" data-attendance-note="' + esc(player.participant_id) + '" value="' + esc(player.note || "") + '"></td></tr>').join("") + "</tbody></table></div>" + button("Save attendance", "save-attendance", "button-gold") : empty("No rostered players", "This team does not have published player assignments yet.");
+      $("#save-attendance") && ($("#save-attendance").onclick = async () => {
+        try {
+          const records = rows.map((player) => ({ participantId: player.participant_id, status: document.querySelector("[data-attendance-status='" + player.participant_id + "']").value, note: document.querySelector("[data-attendance-note='" + player.participant_id + "']").value }));
+          await api("/api/admin/attendance", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ programId: PROGRAM_ID, seasonId: state.seasonId, teamId, attendanceDate: date, records })});
+          showNotice("Attendance saved.");
+          await loadAttendance();
+        } catch (error) { showNotice(error.message); }
+      });
+    } catch (error) { $("#attendance-list").innerHTML = '<div class="error"><strong>Attendance unavailable</strong><p>' + esc(error.message) + "</p></div>"; }
+  }
+
+  async function renderAttendance() {
+    const teams = state.operations && state.operations.teams || [];
+    $("#view").innerHTML =
+      pageHead("Team operations", "Attendance", "Coaches can record attendance only for assigned teams. Volunteers can use this view only when explicitly assigned team support.", "") +
+      '<section class="card span-12"><div class="toolbar"><select class="form-control" id="attendance-team"><option value="">Choose team</option>' + teams.map((team) => '<option value="' + esc(team.id) + '">' + esc(team.name) + "</option>").join("") + '</select><input class="form-control" id="attendance-date" type="date" value="' + new Date().toISOString().slice(0, 10) + '">' + button("Load attendance", "load-attendance", "button-quiet") + "</div><div id=\"attendance-list\">" + empty("Choose a team", "Select a team and date to record attendance.") + "</div></section>";
+    $("#load-attendance").onclick = () => loadAttendance();
+  }
+
+  async function renderDuties() {
+    const payload = await api("/api/admin/volunteer-duties?programId=" + encodeURIComponent(PROGRAM_ID) + "&seasonId=" + encodeURIComponent(state.seasonId));
+    const duties = payload.duties || [];
+    if (canManageProgram() && !state.directory.length) await loadStaff().catch(() => {});
+    $("#view").innerHTML =
+      pageHead("People & permissions", "Volunteer duties", "Assign helpers to specific teams or events. Volunteers see only their own assigned duties and limited team information.", "") +
+      '<div class="grid"><section class="card span-5"><h2>Assign a duty</h2>' +
+      (canManageProgram() ? '<form id="duty-form" class="form-grid"><div class="field full"><label for="duty-user">Volunteer/staff user</label><select class="form-control" id="duty-user" required><option value="">Choose a user</option>' + state.directory.map((item) => '<option value="' + esc(item.id) + '">' + esc(item.display_name || item.email) + "</option>").join("") + "</select></div>" +
+        '<div class="field"><label for="duty-type">Duty type</label><select class="form-control" id="duty-type"><option value="assistant_coach">Assistant coach</option><option value="team_manager">Team manager</option><option value="game_day">Game day</option><option value="field_coordinator">Field coordinator</option><option value="check_in">Check-in</option><option value="other">Other</option></select></div>' +
+        '<div class="field"><label for="duty-team">Team</label><select class="form-control" id="duty-team"><option value="">Program/event duty</option>' + (state.operations && state.operations.teams || []).map((team) => '<option value="' + esc(team.id) + '">' + esc(team.name) + "</option>").join("") + "</select></div>" +
+        '<div class="field"><label for="duty-starts">Starts</label><input class="form-control" id="duty-starts" type="datetime-local"></div><div class="field"><label for="duty-ends">Ends</label><input class="form-control" id="duty-ends" type="datetime-local"></div>' +
+        '<div class="field full"><label for="duty-notes">Notes</label><textarea class="form-control" id="duty-notes"></textarea></div><div class="field full"><div class="actions">' + button("Save duty", "save-duty", "button-gold") + "</div></div></form>" : '<p class="muted">Only league administrators can assign volunteer duties.</p>') +
+      "</section><section class=\"card span-7\"><h2>Assignments</h2>" +
+      (duties.length ? '<div class="assignment-list">' + duties.map((duty) => '<div class="assignment"><div><strong>' + esc(duty.duty_type.replace(/_/g, " ")) + "</strong><div class=\"assignment-meta\">" + esc(duty.display_name || duty.email) + (duty.team_name ? " · " + esc(duty.team_name) : "") + " · " + esc(duty.status) + (duty.starts_at ? " · " + esc(formatDate(duty.starts_at)) : "") + "</div></div>" + (duty.status !== "completed" && duty.status !== "cancelled" && (canManageProgram() || duty.admin_user_id === state.session.user.id) ? '<button class="button button-quiet" data-duty-complete="' + esc(duty.id) + '" type="button">Mark completed</button>' : "") + "</div>").join("") + "</div>" : empty("No volunteer duties", "Create a duty assignment for an assistant coach, team manager, or game-day helper.")) +
+      "</section></div>";
+    $("#duty-form") && ($("#duty-form").onsubmit = async (event) => {
+      event.preventDefault();
+      try {
+        await api("/api/admin/volunteer-duties", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ programId: PROGRAM_ID, seasonId: state.seasonId, adminUserId: $("#duty-user").value, dutyType: $("#duty-type").value, teamId: $("#duty-team").value || null, startsAt: $("#duty-starts").value || null, endsAt: $("#duty-ends").value || null, notes: $("#duty-notes").value })});
+        showNotice("Volunteer duty assigned.");
+        renderDuties();
+      } catch (error) { showNotice(error.message); }
+    });
+    document.querySelectorAll("[data-duty-complete]").forEach((item) => {
+      item.onclick = async () => {
+        try { await api("/api/admin/volunteer-duties/" + encodeURIComponent(item.dataset.dutyComplete), { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status: "completed" })}); showNotice("Duty updated."); renderDuties(); }
+        catch (error) { showNotice(error.message); }
+      };
+    });
+  }
+
   async function renderView() {
     setActiveNav();
     if (!state.workspace) return;
