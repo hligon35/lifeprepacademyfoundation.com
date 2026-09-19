@@ -156,6 +156,13 @@ export default {
       if (url.pathname === "/auth/handoff" && request.method === "GET") {
         return handleAuthHandoffGet(request, env);
       }
+      if (
+        (url.pathname === "/admin" || url.pathname === "/admin/" ||
+          (url.pathname.startsWith("/admin/") && !/\.[a-z0-9]+$/i.test(url.pathname))) &&
+        request.method === "GET"
+      ) {
+        return handleAdminAssetPage(request, env, "/admin/programs/pgs/console.html");
+      }
       if (url.pathname === "/register" || url.pathname === "/register/") {
         return handleAdminAssetPage(request, env, "/index.html");
       }
@@ -867,15 +874,45 @@ async function handlePublicConfig(env, request) {
   );
 }
 
-async function handleAdminRegistrationStatusGet(request, env) {
-  if (!isAuthorizedForSettingsChange(request, env)) {
-    const context = await getAdminContext(request, env);
-    if (!context.ok) return adminError(context);
+function canViewRegistrationProgram(context, programId) {
+  return Boolean(
+    context?.isSuperAdmin ||
+      (context?.programs || []).some((program) => program.id === programId),
+  );
+}
+
+function canManageRegistrationProgram(context, programId) {
+  if (context?.isSuperAdmin) return true;
+  return (context?.roles || []).some(
+    (role) =>
+      role.program_id === programId &&
+      ["program_administrator", "registration_manager"].includes(role.id),
+  );
+}
+
+async function getRegistrationAdminContext(request, env, programId, requireManage = false) {
+  if (isAuthorizedForSettingsChange(request, env)) {
+    return { ok: true, identity: { email: "settings-token" }, via: "settings-token" };
   }
-  const overview = await getRegistrationOverview(env, PADUCAH_GO_PROGRAM_ID);
+  const context = await getAdminContext(request, env);
+  if (!context.ok) return context;
+  const allowed = requireManage
+    ? canManageRegistrationProgram(context, programId)
+    : canViewRegistrationProgram(context, programId);
+  if (!allowed) return { ok: false, status: 403, error: "Registration access denied" };
+  return context;
+}
+
+async function handleAdminRegistrationStatusGet(request, env) {
+  const url = new URL(request.url);
+  const programId = url.searchParams.get("programId") || PADUCAH_GO_PROGRAM_ID;
+  const context = await getRegistrationAdminContext(request, env, programId);
+  if (!context.ok) return adminError(context);
+  const overview = await getRegistrationOverview(env, programId);
   return json(
     {
       ok: true,
+      programId,
       settings: overview.settings,
       activeDrafts: overview.activeDrafts,
       submittedCount: overview.submittedCount,
@@ -887,12 +924,10 @@ async function handleAdminRegistrationStatusGet(request, env) {
 }
 
 async function handleAdminRegistrationStatusUpdate(request, env) {
-  let actorLabel = "unknown admin";
-  if (!isAuthorizedForSettingsChange(request, env)) {
-    const context = await getAdminContext(request, env);
-    if (!context.ok) return adminError(context);
-    actorLabel = context.identity.email || actorLabel;
-  }
+  const url = new URL(request.url);
+  const programId = url.searchParams.get("programId") || PADUCAH_GO_PROGRAM_ID;
+  const context = await getRegistrationAdminContext(request, env, programId, true);
+  if (!context.ok) return adminError(context);
   const payload = await request.json().catch(() => null);
   if (!payload || typeof payload !== "object") {
     return json({ ok: false, error: "Invalid JSON" }, 400, request, env);
@@ -905,15 +940,18 @@ async function handleAdminRegistrationStatusUpdate(request, env) {
       env,
     );
   }
-  actorLabel = String(payload.actorLabel || "").trim() || actorLabel;
+  const actorLabel =
+    String(payload.actorLabel || "").trim() ||
+    context.identity?.email ||
+    "unknown admin";
   try {
     const settings = await updateRegistrationSettings(
       env,
-      PADUCAH_GO_PROGRAM_ID,
+      programId,
       payload,
       actorLabel,
     );
-    return json({ ok: true, settings }, 200, request, env);
+    return json({ ok: true, programId, settings }, 200, request, env);
   } catch (error) {
     return json(
       { ok: false, error: String(error?.message || error) },
