@@ -162,7 +162,7 @@
       '<div class="grid">' +
         '<section class="card span-6"><div class="section-head"><h2>Public registration</h2>' + (status === "open" ? '<span class="pill pill-open">Open</span>' : '<span class="pill pill-closed">Closed</span>') + "</div>" +
           '<p>' + esc(status === "open" ? "Families can begin new registrations." : "New public registrations are blocked. Existing draft or private links follow their configured rules.") + "</p>" +
-          '<div class="status-card"><div><strong>Current status</strong><span class="muted">Updated " + esc(formatDate(settings.updatedAt)) + "</span></div><strong>" + esc(status.toUpperCase()) + "</strong></div>" +
+          '<div class="status-card"><div><strong>Current status</strong><span class="muted">Updated ' + esc(formatDate(settings.updatedAt)) + '</span></div><strong>' + esc(status.toUpperCase()) + '</strong></div>' +
         "</section>" +
         '<section class="card span-6"><h2>Current controls</h2><div class="activity-list">' +
           '<div class="activity"><strong>Draft resume</strong><div class="activity-meta">' + esc(settings.allowDraftResume ? "Allowed for eligible saved registrations." : "Disabled.") + "</div></div>" +
