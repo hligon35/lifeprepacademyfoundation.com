@@ -1,0 +1,642 @@
+From fbafd8837f818fe8622bdbed3bb9306ccb41b063 Mon Sep 17 00:00:00 2001
+From: Codex <codex@openai.com>
+Date: Sun, 20 Sep 2026 02:56:44 +0200
+Subject: [PATCH 1/5] Fix Paducah GO registration toggle enforcement
+
+---
+ mlsregistration/admin/programs/pgs/console.js | 10 +++++++---
+ mlsregistration/worker/index.js               | 13 ++++++++++---
+ 2 files changed, 17 insertions(+), 6 deletions(-)
+
+diff --git a/mlsregistration/admin/programs/pgs/console.js b/mlsregistration/admin/programs/pgs/console.js
+index 5ea932e..cf2f49e 100644
+--- a/mlsregistration/admin/programs/pgs/console.js
++++ b/mlsregistration/admin/programs/pgs/console.js
+@@ -215,7 +215,7 @@
+           '</p><div class="actions">' + button("Manage registration", "open-registration", "button-gold") + button("Review registrants", "open-registrants", "button-quiet") + "</div></section>" +
+         '<section class="card span-4"><div class="section-head"><h2>Registration</h2>' + (status === "open" ? '<span class="pill pill-open">Open</span>' : '<span class="pill pill-closed">Closed</span>') + "</div>" +
+           '<div class="status-card"><div><strong>' + esc(status === "open" ? "Accepting new registrations" : "Not accepting public registrations") + "</strong><span class=\"muted\">" + esc(workspace.registration.submittedCount || 0) + " submitted · " + esc(workspace.registration.activeDrafts || 0) + " active drafts</span></div>" +
+-          (canManageProgram() ? button(status === "open" ? "Close registration" : "Open registration", "toggle-registration", status === "open" ? "button-danger" : "button-gold") : "") + "</div></section>" +
++          (canManageRegistration() ? button(status === "open" ? "Close registration" : "Open registration", "toggle-registration", status === "open" ? "button-danger" : "button-gold") : "") + "</div></section>" +
+         '<section class="card span-6"><div class="section-head"><h2>Hero announcement</h2>' + button("Manage", "open-announcements", "button-quiet") + "</div>" + heroMarkup + "</section>" +
+         '<section class="card span-6"><div class="section-head"><h2>Next operating actions</h2></div><div class="activity-list">' +
+           '<div class="activity"><strong>Team placement</strong><div class="activity-meta">Phase Two will add the balanced team recommendation workflow.</div></div>' +
+@@ -233,7 +233,7 @@
+   function renderRegistration() {
+     const settings = state.workspace.registration && state.workspace.registration.settings || {};
+     const status = settings.registrationStatus === "open" ? "open" : "closed";
+-    const managed = canManageProgram();
++    const managed = canManageRegistration();
+     $("#view").innerHTML =
+       pageHead("Season operations", "Registration control", "This server-side control governs the public Paducah GO registration pages while preserving draft-resume and private-access behavior.", managed ? button(status === "open" ? "Close registration" : "Open registration", "toggle-registration-page", status === "open" ? "button-danger" : "button-gold") : "") +
+       '<div class="grid">' +
+@@ -873,7 +873,7 @@
+     const next = settings.registrationStatus === "open" ? "closed" : "open";
+     if (!window.confirm("Change Paducah GO public registration to " + next.toUpperCase() + "?")) return;
+     try {
+-      await api("/api/admin/registration-status?programId=" + encodeURIComponent(PROGRAM_ID), {
++      const payload = await api("/api/admin/registration-status?programId=" + encodeURIComponent(PROGRAM_ID), {
+         method: "PUT",
+         headers: { "Content-Type": "application/json" },
+         body: JSON.stringify({
+@@ -886,6 +886,10 @@
+           reopensAt: settings.reopensAt
+         })
+       });
++      if (payload.settings) {
++        state.workspace.registration = state.workspace.registration || {};
++        state.workspace.registration.settings = payload.settings;
++      }
+       showNotice("Registration is now " + next + ".");
+       await loadWorkspace(true);
+     } catch (error) { showNotice(error.message); }
+diff --git a/mlsregistration/worker/index.js b/mlsregistration/worker/index.js
+index 71c9efa..c1859c5 100644
+--- a/mlsregistration/worker/index.js
++++ b/mlsregistration/worker/index.js
+@@ -185,7 +185,11 @@ export default {
+         return handleAdminAssetPage(request, env, "/admin/programs/pgs/console.html");
+       }
+       if (url.pathname === "/register" || url.pathname === "/register/") {
+-        return handleAdminAssetPage(request, env, "/index.html");
++        // The public registration form must pass through the same server-side
++        // D1 registration gate as the legacy registration root. Serving the
++        // asset directly here would leave the form visually open after an
++        // administrator closes registration.
++        return handleRegistrationLandingPage(request, env, "/index.html");
+       }
+       // The Paducah GO hostname is a route-driven application shell. Static assets
+       // continue through ASSETS; every application path resolves to the shell.
+@@ -1094,8 +1098,11 @@ async function handlePublicProgramSchedule(request, env) {
+ 
+ // Server-renders the registration landing page's open/closed shell (via HTMLRewriter) so the
+ // correct state is present in the HTML itself, not applied afterward by client JS.
+-async function handleRegistrationLandingPage(request, env) {
+-  const assetResponse = await env.ASSETS.fetch(request);
++async function handleRegistrationLandingPage(request, env, assetPath = "") {
++  const assetUrl = new URL(request.url);
++  if (assetPath) assetUrl.pathname = assetPath;
++  const assetRequest = new Request(assetUrl.toString(), request);
++  const assetResponse = await env.ASSETS.fetch(assetRequest);
+   const contentType = assetResponse.headers.get("Content-Type") || "";
+   if (!assetResponse.ok || !contentType.includes("text/html")) {
+     return assetResponse;
+-- 
+2.51.1
+
+
+From a8187339fa8f1e02e9f1a9d1786c7d3e3fbc0350 Mon Sep 17 00:00:00 2001
+From: Codex <codex@openai.com>
+Date: Sun, 20 Sep 2026 04:02:53 +0200
+Subject: [PATCH 2/5] Make Paducah GO registration toggle authoritative
+
+---
+ .../admin/programs/pgs/console.html           |  2 +-
+ mlsregistration/admin/programs/pgs/console.js | 12 +++-
+ mlsregistration/app.js                        | 57 ++++++++++++++-----
+ mlsregistration/index.html                    |  2 +-
+ mlsregistration/worker/registration-status.js | 18 ++++--
+ 5 files changed, 71 insertions(+), 20 deletions(-)
+
+diff --git a/mlsregistration/admin/programs/pgs/console.html b/mlsregistration/admin/programs/pgs/console.html
+index 2698ce5..a13d49b 100644
+--- a/mlsregistration/admin/programs/pgs/console.html
++++ b/mlsregistration/admin/programs/pgs/console.html
+@@ -67,6 +67,6 @@
+     <p>We are securely checking your approved Google account before opening league operations.</p>
+   </section>
+ 
+-    <script src="/admin/programs/pgs/console.js?v=2026-09-19-6" defer></script>
++    <script src="/admin/programs/pgs/console.js?v=2026-09-20-1" defer></script>
+ </body>
+ </html>
+diff --git a/mlsregistration/admin/programs/pgs/console.js b/mlsregistration/admin/programs/pgs/console.js
+index cf2f49e..0b34296 100644
+--- a/mlsregistration/admin/programs/pgs/console.js
++++ b/mlsregistration/admin/programs/pgs/console.js
+@@ -27,7 +27,7 @@
+   }[character]));
+ 
+   const api = async (path, options = {}) => {
+-    const response = await fetch(path, Object.assign({ credentials: "include" }, options));
++    const response = await fetch(path, Object.assign({ credentials: "include", cache: "no-store" }, options));
+     const payload = await response.json().catch(() => null);
+     if (!response.ok || !payload || payload.ok === false) {
+       throw new Error(payload && payload.error ? payload.error : "Request failed");
+@@ -868,10 +868,17 @@
+     await renderView();
+   }
+ 
++  let registrationToggleInFlight = false;
++
+   async function toggleRegistration() {
++    if (registrationToggleInFlight) return;
+     const settings = state.workspace.registration && state.workspace.registration.settings || {};
+     const next = settings.registrationStatus === "open" ? "closed" : "open";
+     if (!window.confirm("Change Paducah GO public registration to " + next.toUpperCase() + "?")) return;
++    registrationToggleInFlight = true;
++    document.querySelectorAll("#toggle-registration, #toggle-registration-page").forEach((button) => {
++      button.disabled = true;
++    });
+     try {
+       const payload = await api("/api/admin/registration-status?programId=" + encodeURIComponent(PROGRAM_ID), {
+         method: "PUT",
+@@ -893,6 +900,9 @@
+       showNotice("Registration is now " + next + ".");
+       await loadWorkspace(true);
+     } catch (error) { showNotice(error.message); }
++    finally {
++      registrationToggleInFlight = false;
++    }
+   }
+ 
+   async function loadSession() {
+diff --git a/mlsregistration/app.js b/mlsregistration/app.js
+index 29f3e23..3a4fe86 100644
+--- a/mlsregistration/app.js
++++ b/mlsregistration/app.js
+@@ -401,6 +401,7 @@
+   let coachingAgreementDownloadUrl = "";
+   let scholarshipDocumentUrl = "";
+   let registrationSyncWarning = "";
++  let publicConfigPromise;
+   let googleMapsApiKeyPromise;
+   let isSubmittingStage = false;
+   let registrationResumeState = null;
+@@ -421,6 +422,9 @@
+   normalizeAutofilledFieldsSoon();
+   syncAgreementPrefills();
+   updateExperienceSummaryRequirements();
++  loadPublicRegistrationConfig().catch((error) => {
++    console.warn("registration-status-load-failed", error);
++  });
+   initializeRegistrationContinuation().catch((error) => {
+     console.error("registration-resume-init-failed", error);
+     formMessage.classList.remove("form-message--loading", "form-message--success");
+@@ -3897,6 +3901,41 @@
+     validateField(input, { showMessage: false });
+   }
+ 
++  function registrationHasAuthorizedBypass() {
++    const params = new URLSearchParams(window.location.search);
++    const flow = String(params.get("flow") || "").toLowerCase();
++    return params.has("pk") || params.has("resume") || flow === "volunteer" || flow === "coach";
++  }
++
++  function applyPublicRegistrationStatus(registration) {
++    if (!registration || registrationHasAuthorizedBypass()) return;
++    const closed = String(registration.status || "closed").toLowerCase() !== "open";
++    document.documentElement.classList.toggle("registration-is-closed", closed);
++    const message = document.getElementById("registration-closed-message");
++    if (message && registration.message) message.textContent = registration.message;
++    const reopensAt = document.getElementById("registration-reopens-at");
++    if (reopensAt && registration.reopensAt) {
++      reopensAt.hidden = false;
++      reopensAt.textContent = "Registration reopens " + new Date(registration.reopensAt).toLocaleString();
++    }
++  }
++
++  function loadPublicRegistrationConfig() {
++    if (publicConfigPromise) return publicConfigPromise;
++    publicConfigPromise = fetch(PUBLIC_CONFIG_ENDPOINT, {
++      method: "GET",
++      headers: { Accept: "application/json" },
++      credentials: "omit",
++      cache: "no-store",
++    })
++      .then((response) => response.ok ? response.json() : null)
++      .then((payload) => {
++        applyPublicRegistrationStatus(payload?.registration);
++        return payload || null;
++      });
++    return publicConfigPromise;
++  }
++
+   function fetchGoogleMapsApiKey() {
+     if (googleMapsApiKeyPromise) return googleMapsApiKeyPromise;
+ 
+@@ -3906,19 +3945,11 @@
+       }
+ 
+       try {
+-        const res = await fetch(PUBLIC_CONFIG_ENDPOINT, {
+-          method: "GET",
+-          headers: { Accept: "application/json" },
+-          credentials: "omit",
+-          cache: "no-store",
+-        });
+-        if (res.ok) {
+-          const payload = await res.json().catch(() => null);
+-          const key = typeof payload?.googleMapsApiKey === "string"
+-            ? payload.googleMapsApiKey.trim()
+-            : "";
+-          if (key) return key;
+-        }
++        const payload = await loadPublicRegistrationConfig();
++        const key = typeof payload?.googleMapsApiKey === "string"
++          ? payload.googleMapsApiKey.trim()
++          : "";
++        if (key) return key;
+       } catch (_error) {
+         // Address autocomplete remains disabled when config lookup fails.
+       }
+diff --git a/mlsregistration/index.html b/mlsregistration/index.html
+index ec27c84..cf29258 100644
+--- a/mlsregistration/index.html
++++ b/mlsregistration/index.html
+@@ -96,6 +96,6 @@
+     </main>
+ 
+     <script src="./flow-logic.js?v=2026-08-27-1" defer></script>
+-    <script src="./app.js?v=2026-08-31-2" defer></script>
++    <script src="./app.js?v=2026-09-20-1" defer></script>
+   </body>
+ </html>
+diff --git a/mlsregistration/worker/registration-status.js b/mlsregistration/worker/registration-status.js
+index cc667b4..fd4395d 100644
+--- a/mlsregistration/worker/registration-status.js
++++ b/mlsregistration/worker/registration-status.js
+@@ -202,15 +202,25 @@ async function updateRegistrationSettings(env, programId, patch, actorLabel) {
+   }
+   const current = await getRegistrationSettings(env, programId);
+ 
+-  const nextStatus = patch.registrationStatus === "open" ? "open" : "closed";
+-  const nextAllowDraftResume = Boolean(patch.allowDraftResume);
+-  const nextAllowPrivateAccess = Boolean(patch.allowPrivateAccess);
++  const nextStatus = patch.registrationStatus == null
++    ? current.registrationStatus
++    : patch.registrationStatus === "open"
++      ? "open"
++      : "closed";
++  const nextAllowDraftResume = patch.allowDraftResume == null
++    ? current.allowDraftResume
++    : Boolean(patch.allowDraftResume);
++  const nextAllowPrivateAccess = patch.allowPrivateAccess == null
++    ? current.allowPrivateAccess
++    : Boolean(patch.allowPrivateAccess);
+   const nextPublicMessage =
+     patch.publicMessage != null ? String(patch.publicMessage).trim() || null : current.publicMessage;
+   const nextClosedMessage = patch.closedMessage
+     ? String(patch.closedMessage).trim()
+     : current.closedMessage;
+-  const nextReopensAt = patch.reopensAt ? String(patch.reopensAt).trim() : null;
++  const nextReopensAt = Object.prototype.hasOwnProperty.call(patch, "reopensAt")
++    ? String(patch.reopensAt || "").trim() || null
++    : current.reopensAt;
+ 
+   let nextPrivateAccessTokenHash = current.privateAccessTokenHash;
+   if (patch.newPrivateAccessToken) {
+-- 
+2.51.1
+
+
+From bc93a5e566da4d5a79318ee55910bda2ce3c7713 Mon Sep 17 00:00:00 2001
+From: Codex <codex@openai.com>
+Date: Sun, 20 Sep 2026 04:42:25 +0200
+Subject: [PATCH 3/5] Map Players sheet columns to registrant names
+
+---
+ mlsregistration/worker/admin-api.js           | 21 +++--
+ mlsregistration/worker/registrant-import.js   | 87 ++++++++++++++++++-
+ .../worker/registrant-import.test.js          | 79 +++++++++++++++++
+ 3 files changed, 178 insertions(+), 9 deletions(-)
+ create mode 100644 mlsregistration/worker/registrant-import.test.js
+
+diff --git a/mlsregistration/worker/admin-api.js b/mlsregistration/worker/admin-api.js
+index 5e0de6e..1000394 100644
+--- a/mlsregistration/worker/admin-api.js
++++ b/mlsregistration/worker/admin-api.js
+@@ -2,7 +2,11 @@ import { adminError, getAdminContext, normalizeProgram } from "./admin-auth.js";
+ import { getRegistrationOverview } from "./registration-status.js";
+ import { handleOperationsApi } from "./operations-api.js";
+ import { handleCommerceApi } from "./commerce-api.js";
+-import { importSheetRegistrants, parseCsv } from "./registrant-import.js";
++import {
++  importSheetRegistrants,
++  parseCsv,
++  playersSheetNameFields,
++} from "./registrant-import.js";
+ 
+ 
+ const PROGRAM_MANAGER_ROLES = new Set(["super_admin", "program_administrator"]);
+@@ -163,7 +167,9 @@ async function listRegistrants(request, env, context) {
+     const agreementPlyrComplete = Number(row.agreement_plyr_complete) === 1;
+     const parentFirst = text(row.parent_first_name) || fallback.parentFirst;
+     const parentLast = text(row.parent_last_name) || fallback.parentLast;
+-    const participantNames = text(row.participant_names) || fallback.participantNames;
++    // Prefer the complete names recovered from the imported sheet payload.
++    // Older imports may have stored only last names in registration_participants.
++    const participantNames = fallback.participantNames || text(row.participant_names);
+     const { raw_payload_json: _rawPayload, ...safeRow } = row;
+     return {
+       ...safeRow,
+@@ -435,16 +441,19 @@ function registrationNameFallback(rawPayload) {
+     return { parentFirst: "", parentLast: "", participantNames: "" };
+   }
+   const values = normalizedPayload(parsed);
+-  const parentFirst = firstValue(values, "parent_first_name", "parent_guardian_first_name", "guardian_first_name");
+-  const parentLast = firstValue(values, "parent_last_name", "parent_guardian_last_name", "guardian_last_name");
++  const sheetNames = playersSheetNameFields(parsed);
++  const parentFirst = firstValue(values, "parent_first_name", "parent_guardian_first_name", "guardian_first_name") || sheetNames.parentFirst;
++  const parentLast = firstValue(values, "parent_last_name", "parent_guardian_last_name", "guardian_last_name") || sheetNames.parentLast;
+   const players = [];
+   for (let index = 1; index <= 4; index += 1) {
+     const first = firstValue(values, `player_${index}_first_name`, `player${index}_first_name`, `player_${index}_firstname`, `player${index}firstname`);
+     const last = firstValue(values, `player_${index}_last_name`, `player${index}_last_name`, `player_${index}_lastname`, `player${index}lastname`);
+-    const name = `${first} ${last}`.trim();
++    const namedValue = `${first} ${last}`.trim();
++    const sheetValue = sheetNames.playerNames?.[index - 1] || "";
++    const name = sheetValue && (!first || !last) ? sheetValue : namedValue;
+     if (name) players.push(name);
+   }
+-  const existingNames = firstValue(values, "participant_names", "players");
++  const existingNames = firstValue(values, "participant_names", "players") || sheetNames.participantNames;
+   return {
+     parentFirst,
+     parentLast,
+diff --git a/mlsregistration/worker/registrant-import.js b/mlsregistration/worker/registrant-import.js
+index 01bd18c..c80e85c 100644
+--- a/mlsregistration/worker/registrant-import.js
++++ b/mlsregistration/worker/registrant-import.js
+@@ -29,6 +29,82 @@ function normalizedKey(key) {
+     .replace(/^_+|_+$/g, "");
+ }
+ 
++// The Players sheet has stable name columns even though its exported header
++// labels have changed over time. Column indexes are zero-based here.
++const PLAYERS_SHEET_NAME_COLUMNS = Object.freeze({
++  parentFirst: { letter: "AA", index: 26 },
++  parentLast: { letter: "AB", index: 27 },
++  player1First: { letter: "AN", index: 39 },
++  player1Last: { letter: "AO", index: 40 },
++  player2First: { letter: "BA", index: 52 },
++  player2Last: { letter: "BB", index: 53 },
++  player3First: { letter: "BN", index: 65 },
++  player3Last: { letter: "BO", index: 66 },
++});
++
++function sourceColumnValue(values, cells, column) {
++  const fromCells = Array.isArray(cells) ? text(cells[column.index]) : "";
++  return fromCells || first(values, column.letter, column.letter.toLowerCase());
++}
++
++export function applyPlayersSheetNameMapping(values, cells = null) {
++  const mappings = [
++    ["parent_first_name", PLAYERS_SHEET_NAME_COLUMNS.parentFirst],
++    ["parent_last_name", PLAYERS_SHEET_NAME_COLUMNS.parentLast],
++    ["player_1_first_name", PLAYERS_SHEET_NAME_COLUMNS.player1First],
++    ["player_1_last_name", PLAYERS_SHEET_NAME_COLUMNS.player1Last],
++    ["player_2_first_name", PLAYERS_SHEET_NAME_COLUMNS.player2First],
++    ["player_2_last_name", PLAYERS_SHEET_NAME_COLUMNS.player2Last],
++    ["player_3_first_name", PLAYERS_SHEET_NAME_COLUMNS.player3First],
++    ["player_3_last_name", PLAYERS_SHEET_NAME_COLUMNS.player3Last],
++  ];
++
++  for (const [target, column] of mappings) {
++    if (!first(values, target)) {
++      const value = sourceColumnValue(values, cells, column);
++      if (value) values[target] = value;
++    }
++  }
++
++  if (!first(values, "player_count", "number_of_players")) {
++    const count = [1, 2, 3].filter((index) =>
++      first(values, `player_${index}_first_name`, `player_${index}_last_name`),
++    ).length;
++    if (count) values.player_count = String(count);
++  }
++  return values;
++}
++
++function originalPayloadCells(payload) {
++  const entries = Object.entries(payload || {});
++  const originalEntries = entries.filter(([key]) => {
++    const normalized = normalizedKey(key);
++    return normalized !== key || !entries.some(([candidate]) =>
++      candidate !== key && normalizedKey(candidate) === normalized,
++    );
++  });
++  return originalEntries.map(([, value]) => text(value));
++}
++
++export function playersSheetNameFields(payload) {
++  const values = payload || {};
++  const cells = originalPayloadCells(values);
++  const read = (column) => sourceColumnValue(values, cells, column);
++  const players = [
++    [read(PLAYERS_SHEET_NAME_COLUMNS.player1First), read(PLAYERS_SHEET_NAME_COLUMNS.player1Last)],
++    [read(PLAYERS_SHEET_NAME_COLUMNS.player2First), read(PLAYERS_SHEET_NAME_COLUMNS.player2Last)],
++    [read(PLAYERS_SHEET_NAME_COLUMNS.player3First), read(PLAYERS_SHEET_NAME_COLUMNS.player3Last)],
++  ]
++    .map(([firstName, lastName]) => `${firstName} ${lastName}`.trim())
++    .filter(Boolean);
++  return {
++    parentFirst: read(PLAYERS_SHEET_NAME_COLUMNS.parentFirst),
++    parentLast: read(PLAYERS_SHEET_NAME_COLUMNS.parentLast),
++    playerNames: players,
++    participantNames: players.join("||"),
++  };
++}
++
+ function normalizeImportedValues(row) {
+   const values = {};
+   Object.entries(row || {}).forEach(([key, value]) => {
+@@ -78,6 +154,7 @@ function deriveRegistrationStatus(row, paymentStatus, agreementStatus) {
+ 
+ function normalizeRow(row) {
+   const values = normalizeImportedValues(row);
++  applyPlayersSheetNameMapping(values);
+   const submissionId = first(
+     values,
+     "registration_submission_id",
+@@ -252,8 +329,12 @@ export function parseCsv(textValue) {
+   const headers = rows.shift().map((header) => text(header));
+   return rows
+     .filter((cells) => cells.some((cell) => text(cell)))
+-    .map((cells) => headers.reduce((record, header, index) => {
+-      if (header) record[header] = text(cells[index]);
++    .map((cells) => {
++      const record = headers.reduce((result, header, index) => {
++        if (header) result[header] = text(cells[index]);
++        return result;
++      }, {});
++      applyPlayersSheetNameMapping(record, cells);
+       return record;
+-    }, {}));
++    });
+ }
+diff --git a/mlsregistration/worker/registrant-import.test.js b/mlsregistration/worker/registrant-import.test.js
+new file mode 100644
+index 0000000..fcc3c20
+--- /dev/null
++++ b/mlsregistration/worker/registrant-import.test.js
+@@ -0,0 +1,79 @@
++import assert from "node:assert/strict";
++import test from "node:test";
++import {
++  parseCsv,
++  applyPlayersSheetNameMapping,
++  playersSheetNameFields,
++} from "./registrant-import.js";
++
++function sheetRow(values) {
++  const cells = Array.from({ length: 67 }, () => "");
++  Object.entries(values).forEach(([index, value]) => {
++    cells[Number(index)] = value;
++  });
++  return cells;
++}
++
++test("maps Players sheet name columns into registration fields", () => {
++  const headers = Array.from({ length: 67 }, (_, index) => `Column ${index + 1}`);
++  const cells = sheetRow({
++    0: "submission-1",
++    26: "Jordan",
++    27: "Ligon",
++    39: "Avery",
++    40: "Ligon",
++    52: "Blake",
++    53: "Ligon",
++    65: "Casey",
++    66: "Ligon",
++  });
++  headers[0] = "Submission ID";
++  const [row] = parseCsv([headers.join(","), cells.join(",")].join("\n"));
++
++  assert.equal(row.parent_first_name, "Jordan");
++  assert.equal(row.parent_last_name, "Ligon");
++  assert.equal(row.player_1_first_name, "Avery");
++  assert.equal(row.player_1_last_name, "Ligon");
++  assert.equal(row.player_2_first_name, "Blake");
++  assert.equal(row.player_2_last_name, "Ligon");
++  assert.equal(row.player_3_first_name, "Casey");
++  assert.equal(row.player_3_last_name, "Ligon");
++  assert.equal(row.player_count, "3");
++});
++
++test("recovers fixed-column names from an existing imported payload", () => {
++  const payload = {};
++  const cells = sheetRow({
++    26: "Jordan",
++    27: "Ligon",
++    39: "Avery",
++    40: "Ligon",
++    52: "Blake",
++    53: "Ligon",
++    65: "Casey",
++    66: "Ligon",
++  });
++  cells.forEach((value, index) => { payload[`Column ${index + 1}`] = value; });
++  const names = playersSheetNameFields(payload);
++
++  assert.deepEqual(names, {
++    parentFirst: "Jordan",
++    parentLast: "Ligon",
++    playerNames: ["Avery Ligon", "Blake Ligon", "Casey Ligon"],
++    participantNames: "Avery Ligon||Blake Ligon||Casey Ligon",
++  });
++});
++
++test("does not overwrite explicit normalized names", () => {
++  const values = {
++    parent_first_name: "Explicit Parent",
++    parent_last_name: "Name",
++    player_1_first_name: "Explicit Player",
++    player_1_last_name: "Name",
++  };
++  const cells = sheetRow({ 26: "Sheet Parent", 27: "Name", 39: "Sheet Player", 40: "Name" });
++  applyPlayersSheetNameMapping(values, cells);
++
++  assert.equal(values.parent_first_name, "Explicit Parent");
++  assert.equal(values.player_1_first_name, "Explicit Player");
++});
+-- 
+2.51.1
+
+
+From f065a9fc96f316f7260b36e2b7f86d4218b59041 Mon Sep 17 00:00:00 2001
+From: Codex <codex@openai.com>
+Date: Sun, 20 Sep 2026 05:11:00 +0200
+Subject: [PATCH 4/5] Fix Paducah GO admin page grid layout
+
+---
+ mlsregistration/admin/programs/pgs/console.css  | 5 +++++
+ mlsregistration/admin/programs/pgs/console.html | 2 +-
+ 2 files changed, 6 insertions(+), 1 deletion(-)
+
+diff --git a/mlsregistration/admin/programs/pgs/console.css b/mlsregistration/admin/programs/pgs/console.css
+index 1532152..1846aa4 100644
+--- a/mlsregistration/admin/programs/pgs/console.css
++++ b/mlsregistration/admin/programs/pgs/console.css
+@@ -10,3 +10,8 @@
+ .result-entry{display:flex;align-items:center;gap:6px;margin-top:8px}.result-entry .form-control{width:58px;min-width:0;padding:6px}.result-entry .button{min-height:32px;padding:6px 9px;font-size:.75rem}
+ .template-section{margin-top:16px}.template-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:16px 0 22px}.template-card{padding:15px;border:1px solid var(--line);border-radius:12px;background:#fbfcfe}.template-card>div{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}.template-card strong{color:var(--purple)}.template-card span,.template-card p,.template-meta{color:var(--muted);font-size:.78rem}.template-card p{margin:9px 0}.template-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:22px;padding-top:20px;border-top:1px solid var(--line)}
+ @media(max-width:720px){.template-list,.template-actions{grid-template-columns:1fr}}
++
++/* The roster, schedule, volunteer, merchandise, and staff views use five/seven-column splits. */
++.span-7{grid-column:span 7}
++.span-5{grid-column:span 5}
++@media(max-width:980px){.span-7,.span-5{grid-column:span 12}}
+diff --git a/mlsregistration/admin/programs/pgs/console.html b/mlsregistration/admin/programs/pgs/console.html
+index a13d49b..3c2a1f4 100644
+--- a/mlsregistration/admin/programs/pgs/console.html
++++ b/mlsregistration/admin/programs/pgs/console.html
+@@ -5,7 +5,7 @@
+   <meta name="viewport" content="width=device-width,initial-scale=1">
+   <meta name="robots" content="noindex,nofollow">
+   <title>Paducah GO Admin | LifePrep Academy Foundation</title>
+-  <link rel="stylesheet" href="/admin/programs/pgs/console.css?v=2026-09-19-3">
++  <link rel="stylesheet" href="/admin/programs/pgs/console.css?v=2026-09-20-2">
+ </head>
+ <body class="pgs-admin">
+   <header class="topbar">
+-- 
+2.51.1
+
+
+From e745070e830b2ce42d8ddb1c34cdd393c86b5db0 Mon Sep 17 00:00:00 2001
+From: Codex <codex@openai.com>
+Date: Sun, 20 Sep 2026 06:25:44 +0200
+Subject: [PATCH 5/5] Prevent stale Paducah GO admin shell assets
+
+---
+ mlsregistration/admin/programs/pgs/console.html | 2 +-
+ mlsregistration/worker/index.js                 | 9 ++++++++-
+ 2 files changed, 9 insertions(+), 2 deletions(-)
+
+diff --git a/mlsregistration/admin/programs/pgs/console.html b/mlsregistration/admin/programs/pgs/console.html
+index 3c2a1f4..7086e75 100644
+--- a/mlsregistration/admin/programs/pgs/console.html
++++ b/mlsregistration/admin/programs/pgs/console.html
+@@ -5,7 +5,7 @@
+   <meta name="viewport" content="width=device-width,initial-scale=1">
+   <meta name="robots" content="noindex,nofollow">
+   <title>Paducah GO Admin | LifePrep Academy Foundation</title>
+-  <link rel="stylesheet" href="/admin/programs/pgs/console.css?v=2026-09-20-2">
++  <link rel="stylesheet" href="/admin/programs/pgs/console.css?v=2026-09-20-3">
+ </head>
+ <body class="pgs-admin">
+   <header class="topbar">
+diff --git a/mlsregistration/worker/index.js b/mlsregistration/worker/index.js
+index c1859c5..5ad219d 100644
+--- a/mlsregistration/worker/index.js
++++ b/mlsregistration/worker/index.js
+@@ -665,7 +665,14 @@ function handleAdminAssetPage(request, env, assetPath, role = "") {
+   url.pathname = assetPath;
+   if (role) url.searchParams.set("role", role);
+   const assetRequest = new Request(url.toString(), request);
+-  return env.ASSETS.fetch(assetRequest);
++  return env.ASSETS.fetch(assetRequest).then((response) => {
++    // Admin shells must pick up new asset references immediately after a
++    // deployment. Static CSS/JS remains cache-busted by its query version.
++    const headers = new Headers(response.headers);
++    headers.set("Cache-Control", "no-store, max-age=0, must-revalidate");
++    headers.set("CDN-Cache-Control", "no-store");
++    return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
++  });
+ }
+ 
+ async function handleResumeContext(request, env) {
+-- 
+2.51.1
+

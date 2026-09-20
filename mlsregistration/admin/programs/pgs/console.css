@@ -669,6 +669,7 @@ a {
   background: #f1e9ff;
 }
 
+<<<<<<< HEAD
 .result-entry {
   display: flex;
   align-items: center;
@@ -745,3 +746,13 @@ a {
   }
 }
 }
+=======
+.result-entry{display:flex;align-items:center;gap:6px;margin-top:8px}.result-entry .form-control{width:58px;min-width:0;padding:6px}.result-entry .button{min-height:32px;padding:6px 9px;font-size:.75rem}
+.template-section{margin-top:16px}.template-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:16px 0 22px}.template-card{padding:15px;border:1px solid var(--line);border-radius:12px;background:#fbfcfe}.template-card>div{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}.template-card strong{color:var(--purple)}.template-card span,.template-card p,.template-meta{color:var(--muted);font-size:.78rem}.template-card p{margin:9px 0}.template-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:22px;padding-top:20px;border-top:1px solid var(--line)}
+@media(max-width:720px){.template-list,.template-actions{grid-template-columns:1fr}}
+
+/* The roster, schedule, volunteer, merchandise, and staff views use five/seven-column splits. */
+.span-7{grid-column:span 7}
+.span-5{grid-column:span 5}
+@media(max-width:980px){.span-7,.span-5{grid-column:span 12}}
+>>>>>>> Fix Paducah GO admin page grid layout
