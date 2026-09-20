@@ -665,7 +665,14 @@ function handleAdminAssetPage(request, env, assetPath, role = "") {
   url.pathname = assetPath;
   if (role) url.searchParams.set("role", role);
   const assetRequest = new Request(url.toString(), request);
-  return env.ASSETS.fetch(assetRequest);
+  return env.ASSETS.fetch(assetRequest).then((response) => {
+    // Admin shells must pick up new asset references immediately after a
+    // deployment. Static CSS/JS remains cache-busted by its query version.
+    const headers = new Headers(response.headers);
+    headers.set("Cache-Control", "no-store, max-age=0, must-revalidate");
+    headers.set("CDN-Cache-Control", "no-store");
+    return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
+  });
 }
 
 async function handleResumeContext(request, env) {
