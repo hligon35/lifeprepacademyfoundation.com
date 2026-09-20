@@ -60,10 +60,12 @@ export function applyPlayersSheetNameMapping(values, cells = null) {
   ];
 
   for (const [target, column] of mappings) {
-    if (!first(values, target)) {
-      const value = sourceColumnValue(values, cells, column);
-      if (value) values[target] = value;
-    }
+    // The fixed Players-sheet positions are the authoritative source for this
+    // import. A legacy header alias can otherwise populate a canonical field
+    // with only a last name and prevent the positional value from replacing it.
+    const positionalValue = Array.isArray(cells) ? text(cells[column.index]) : "";
+    const value = positionalValue || (!first(values, target) ? sourceColumnValue(values, cells, column) : "");
+    if (value) values[target] = value;
   }
 
   if (!first(values, "player_count", "number_of_players")) {
@@ -76,8 +78,12 @@ export function applyPlayersSheetNameMapping(values, cells = null) {
 }
 
 function originalPayloadCells(payload) {
+  if (Array.isArray(payload?.__sheet_cells)) {
+    return payload.__sheet_cells.map((value) => text(value));
+  }
   const entries = Object.entries(payload || {});
   const originalEntries = entries.filter(([key]) => {
+    if (key === "__sheet_cells") return false;
     const normalized = normalizedKey(key);
     return normalized !== key || !entries.some(([candidate]) =>
       candidate !== key && normalizedKey(candidate) === normalized,
@@ -334,6 +340,9 @@ export function parseCsv(textValue) {
         if (header) result[header] = text(cells[index]);
         return result;
       }, {});
+      // Preserve positional cells so the API can repair older/ambiguous
+      // header mappings when the registrant list is read later.
+      record.__sheet_cells = cells.map((cell) => text(cell));
       applyPlayersSheetNameMapping(record, cells);
       return record;
     });

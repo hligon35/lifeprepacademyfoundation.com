@@ -39,6 +39,12 @@ test("maps Players sheet name columns into registration fields", () => {
   assert.equal(row.player_3_first_name, "Casey");
   assert.equal(row.player_3_last_name, "Ligon");
   assert.equal(row.player_count, "3");
+  assert.deepEqual(playersSheetNameFields(row), {
+    parentFirst: "Jordan",
+    parentLast: "Ligon",
+    playerNames: ["Avery Ligon", "Blake Ligon", "Casey Ligon"],
+    participantNames: "Avery Ligon||Blake Ligon||Casey Ligon",
+  });
 });
 
 test("recovers fixed-column names from an existing imported payload", () => {
@@ -71,9 +77,30 @@ test("does not overwrite explicit normalized names", () => {
     player_1_first_name: "Explicit Player",
     player_1_last_name: "Name",
   };
-  const cells = sheetRow({ 26: "Sheet Parent", 27: "Name", 39: "Sheet Player", 40: "Name" });
-  applyPlayersSheetNameMapping(values, cells);
+  applyPlayersSheetNameMapping(values);
 
   assert.equal(values.parent_first_name, "Explicit Parent");
   assert.equal(values.player_1_first_name, "Explicit Player");
+});
+
+test("fixed sheet columns override legacy last-name aliases", () => {
+  const values = {
+    parent_first_name: "Ligon",
+    parent_last_name: "Ligon",
+    player_1_first_name: "Ligon",
+    player_1_last_name: "Ligon",
+  };
+  const cells = sheetRow({
+    26: "Jordan",
+    27: "Ligon",
+    39: "Avery",
+    40: "Ligon",
+  });
+
+  applyPlayersSheetNameMapping(values, cells);
+
+  assert.equal(values.parent_first_name, "Jordan");
+  assert.equal(values.parent_last_name, "Ligon");
+  assert.equal(values.player_1_first_name, "Avery");
+  assert.equal(values.player_1_last_name, "Ligon");
 });
