@@ -27,7 +27,7 @@
   }[character]));
 
   const api = async (path, options = {}) => {
-    const response = await fetch(path, Object.assign({ credentials: "include" }, options));
+    const response = await fetch(path, Object.assign({ credentials: "include", cache: "no-store" }, options));
     const payload = await response.json().catch(() => null);
     if (!response.ok || !payload || payload.ok === false) {
       throw new Error(payload && payload.error ? payload.error : "Request failed");
@@ -215,7 +215,7 @@
           '</p><div class="actions">' + button("Manage registration", "open-registration", "button-gold") + button("Review registrants", "open-registrants", "button-quiet") + "</div></section>" +
         '<section class="card span-4"><div class="section-head"><h2>Registration</h2>' + (status === "open" ? '<span class="pill pill-open">Open</span>' : '<span class="pill pill-closed">Closed</span>') + "</div>" +
           '<div class="status-card"><div><strong>' + esc(status === "open" ? "Accepting new registrations" : "Not accepting public registrations") + "</strong><span class=\"muted\">" + esc(workspace.registration.submittedCount || 0) + " submitted · " + esc(workspace.registration.activeDrafts || 0) + " active drafts</span></div>" +
-          (canManageProgram() ? button(status === "open" ? "Close registration" : "Open registration", "toggle-registration", status === "open" ? "button-danger" : "button-gold") : "") + "</div></section>" +
+          (canManageRegistration() ? button(status === "open" ? "Close registration" : "Open registration", "toggle-registration", status === "open" ? "button-danger" : "button-gold") : "") + "</div></section>" +
         '<section class="card span-6"><div class="section-head"><h2>Hero announcement</h2>' + button("Manage", "open-announcements", "button-quiet") + "</div>" + heroMarkup + "</section>" +
         '<section class="card span-6"><div class="section-head"><h2>Next operating actions</h2></div><div class="activity-list">' +
           '<div class="activity"><strong>Team placement</strong><div class="activity-meta">Phase Two will add the balanced team recommendation workflow.</div></div>' +
@@ -233,7 +233,7 @@
   function renderRegistration() {
     const settings = state.workspace.registration && state.workspace.registration.settings || {};
     const status = settings.registrationStatus === "open" ? "open" : "closed";
-    const managed = canManageProgram();
+    const managed = canManageRegistration();
     $("#view").innerHTML =
       pageHead("Season operations", "Registration control", "This server-side control governs the public Paducah GO registration pages while preserving draft-resume and private-access behavior.", managed ? button(status === "open" ? "Close registration" : "Open registration", "toggle-registration-page", status === "open" ? "button-danger" : "button-gold") : "") +
       '<div class="grid">' +
@@ -868,12 +868,19 @@
     await renderView();
   }
 
+  let registrationToggleInFlight = false;
+
   async function toggleRegistration() {
+    if (registrationToggleInFlight) return;
     const settings = state.workspace.registration && state.workspace.registration.settings || {};
     const next = settings.registrationStatus === "open" ? "closed" : "open";
     if (!window.confirm("Change Paducah GO public registration to " + next.toUpperCase() + "?")) return;
+    registrationToggleInFlight = true;
+    document.querySelectorAll("#toggle-registration, #toggle-registration-page").forEach((button) => {
+      button.disabled = true;
+    });
     try {
-      await api("/api/admin/registration-status?programId=" + encodeURIComponent(PROGRAM_ID), {
+      const payload = await api("/api/admin/registration-status?programId=" + encodeURIComponent(PROGRAM_ID), {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -886,9 +893,16 @@
           reopensAt: settings.reopensAt
         })
       });
+      if (payload.settings) {
+        state.workspace.registration = state.workspace.registration || {};
+        state.workspace.registration.settings = payload.settings;
+      }
       showNotice("Registration is now " + next + ".");
       await loadWorkspace(true);
     } catch (error) { showNotice(error.message); }
+    finally {
+      registrationToggleInFlight = false;
+    }
   }
 
   async function loadSession() {

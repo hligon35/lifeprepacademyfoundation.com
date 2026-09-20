@@ -202,15 +202,25 @@ async function updateRegistrationSettings(env, programId, patch, actorLabel) {
   }
   const current = await getRegistrationSettings(env, programId);
 
-  const nextStatus = patch.registrationStatus === "open" ? "open" : "closed";
-  const nextAllowDraftResume = Boolean(patch.allowDraftResume);
-  const nextAllowPrivateAccess = Boolean(patch.allowPrivateAccess);
+  const nextStatus = patch.registrationStatus == null
+    ? current.registrationStatus
+    : patch.registrationStatus === "open"
+      ? "open"
+      : "closed";
+  const nextAllowDraftResume = patch.allowDraftResume == null
+    ? current.allowDraftResume
+    : Boolean(patch.allowDraftResume);
+  const nextAllowPrivateAccess = patch.allowPrivateAccess == null
+    ? current.allowPrivateAccess
+    : Boolean(patch.allowPrivateAccess);
   const nextPublicMessage =
     patch.publicMessage != null ? String(patch.publicMessage).trim() || null : current.publicMessage;
   const nextClosedMessage = patch.closedMessage
     ? String(patch.closedMessage).trim()
     : current.closedMessage;
-  const nextReopensAt = patch.reopensAt ? String(patch.reopensAt).trim() : null;
+  const nextReopensAt = Object.prototype.hasOwnProperty.call(patch, "reopensAt")
+    ? String(patch.reopensAt || "").trim() || null
+    : current.reopensAt;
 
   let nextPrivateAccessTokenHash = current.privateAccessTokenHash;
   if (patch.newPrivateAccessToken) {

@@ -185,7 +185,11 @@ export default {
         return handleAdminAssetPage(request, env, "/admin/programs/pgs/console.html");
       }
       if (url.pathname === "/register" || url.pathname === "/register/") {
-        return handleAdminAssetPage(request, env, "/index.html");
+        // The public registration form must pass through the same server-side
+        // D1 registration gate as the legacy registration root. Serving the
+        // asset directly here would leave the form visually open after an
+        // administrator closes registration.
+        return handleRegistrationLandingPage(request, env, "/index.html");
       }
       // The Paducah GO hostname is a route-driven application shell. Static assets
       // continue through ASSETS; every application path resolves to the shell.
@@ -1094,8 +1098,11 @@ async function handlePublicProgramSchedule(request, env) {
 
 // Server-renders the registration landing page's open/closed shell (via HTMLRewriter) so the
 // correct state is present in the HTML itself, not applied afterward by client JS.
-async function handleRegistrationLandingPage(request, env) {
-  const assetResponse = await env.ASSETS.fetch(request);
+async function handleRegistrationLandingPage(request, env, assetPath = "") {
+  const assetUrl = new URL(request.url);
+  if (assetPath) assetUrl.pathname = assetPath;
+  const assetRequest = new Request(assetUrl.toString(), request);
+  const assetResponse = await env.ASSETS.fetch(assetRequest);
   const contentType = assetResponse.headers.get("Content-Type") || "";
   if (!assetResponse.ok || !contentType.includes("text/html")) {
     return assetResponse;

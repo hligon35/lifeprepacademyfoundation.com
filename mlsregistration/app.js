@@ -401,6 +401,7 @@
   let coachingAgreementDownloadUrl = "";
   let scholarshipDocumentUrl = "";
   let registrationSyncWarning = "";
+  let publicConfigPromise;
   let googleMapsApiKeyPromise;
   let isSubmittingStage = false;
   let registrationResumeState = null;
@@ -421,6 +422,9 @@
   normalizeAutofilledFieldsSoon();
   syncAgreementPrefills();
   updateExperienceSummaryRequirements();
+  loadPublicRegistrationConfig().catch((error) => {
+    console.warn("registration-status-load-failed", error);
+  });
   initializeRegistrationContinuation().catch((error) => {
     console.error("registration-resume-init-failed", error);
     formMessage.classList.remove("form-message--loading", "form-message--success");
@@ -3897,6 +3901,41 @@
     validateField(input, { showMessage: false });
   }
 
+  function registrationHasAuthorizedBypass() {
+    const params = new URLSearchParams(window.location.search);
+    const flow = String(params.get("flow") || "").toLowerCase();
+    return params.has("pk") || params.has("resume") || flow === "volunteer" || flow === "coach";
+  }
+
+  function applyPublicRegistrationStatus(registration) {
+    if (!registration || registrationHasAuthorizedBypass()) return;
+    const closed = String(registration.status || "closed").toLowerCase() !== "open";
+    document.documentElement.classList.toggle("registration-is-closed", closed);
+    const message = document.getElementById("registration-closed-message");
+    if (message && registration.message) message.textContent = registration.message;
+    const reopensAt = document.getElementById("registration-reopens-at");
+    if (reopensAt && registration.reopensAt) {
+      reopensAt.hidden = false;
+      reopensAt.textContent = "Registration reopens " + new Date(registration.reopensAt).toLocaleString();
+    }
+  }
+
+  function loadPublicRegistrationConfig() {
+    if (publicConfigPromise) return publicConfigPromise;
+    publicConfigPromise = fetch(PUBLIC_CONFIG_ENDPOINT, {
+      method: "GET",
+      headers: { Accept: "application/json" },
+      credentials: "omit",
+      cache: "no-store",
+    })
+      .then((response) => response.ok ? response.json() : null)
+      .then((payload) => {
+        applyPublicRegistrationStatus(payload?.registration);
+        return payload || null;
+      });
+    return publicConfigPromise;
+  }
+
   function fetchGoogleMapsApiKey() {
     if (googleMapsApiKeyPromise) return googleMapsApiKeyPromise;
 
@@ -3906,19 +3945,11 @@
       }
 
       try {
-        const res = await fetch(PUBLIC_CONFIG_ENDPOINT, {
-          method: "GET",
-          headers: { Accept: "application/json" },
-          credentials: "omit",
-          cache: "no-store",
-        });
-        if (res.ok) {
-          const payload = await res.json().catch(() => null);
-          const key = typeof payload?.googleMapsApiKey === "string"
-            ? payload.googleMapsApiKey.trim()
-            : "";
-          if (key) return key;
-        }
+        const payload = await loadPublicRegistrationConfig();
+        const key = typeof payload?.googleMapsApiKey === "string"
+          ? payload.googleMapsApiKey.trim()
+          : "";
+        if (key) return key;
       } catch (_error) {
         // Address autocomplete remains disabled when config lookup fails.
       }
