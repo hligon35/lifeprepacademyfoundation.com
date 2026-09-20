@@ -1,0 +1,248 @@
+diff --git a/mlsregistration/worker/admin-api.js b/mlsregistration/worker/admin-api.js
+index 5e0de6e..1000394 100644
+--- a/mlsregistration/worker/admin-api.js
++++ b/mlsregistration/worker/admin-api.js
+@@ -2,7 +2,11 @@ import { adminError, getAdminContext, normalizeProgram } from "./admin-auth.js";
+ import { getRegistrationOverview } from "./registration-status.js";
+ import { handleOperationsApi } from "./operations-api.js";
+ import { handleCommerceApi } from "./commerce-api.js";
+-import { importSheetRegistrants, parseCsv } from "./registrant-import.js";
++import {
++  importSheetRegistrants,
++  parseCsv,
++  playersSheetNameFields,
++} from "./registrant-import.js";
+ 
+ 
+ const PROGRAM_MANAGER_ROLES = new Set(["super_admin", "program_administrator"]);
+@@ -163,7 +167,9 @@ async function listRegistrants(request, env, context) {
+     const agreementPlyrComplete = Number(row.agreement_plyr_complete) === 1;
+     const parentFirst = text(row.parent_first_name) || fallback.parentFirst;
+     const parentLast = text(row.parent_last_name) || fallback.parentLast;
+-    const participantNames = text(row.participant_names) || fallback.participantNames;
++    // Prefer the complete names recovered from the imported sheet payload.
++    // Older imports may have stored only last names in registration_participants.
++    const participantNames = fallback.participantNames || text(row.participant_names);
+     const { raw_payload_json: _rawPayload, ...safeRow } = row;
+     return {
+       ...safeRow,
+@@ -435,16 +441,19 @@ function registrationNameFallback(rawPayload) {
+     return { parentFirst: "", parentLast: "", participantNames: "" };
+   }
+   const values = normalizedPayload(parsed);
+-  const parentFirst = firstValue(values, "parent_first_name", "parent_guardian_first_name", "guardian_first_name");
+-  const parentLast = firstValue(values, "parent_last_name", "parent_guardian_last_name", "guardian_last_name");
++  const sheetNames = playersSheetNameFields(parsed);
++  const parentFirst = firstValue(values, "parent_first_name", "parent_guardian_first_name", "guardian_first_name") || sheetNames.parentFirst;
++  const parentLast = firstValue(values, "parent_last_name", "parent_guardian_last_name", "guardian_last_name") || sheetNames.parentLast;
+   const players = [];
+   for (let index = 1; index <= 4; index += 1) {
+     const first = firstValue(values, `player_${index}_first_name`, `player${index}_first_name`, `player_${index}_firstname`, `player${index}firstname`);
+     const last = firstValue(values, `player_${index}_last_name`, `player${index}_last_name`, `player_${index}_lastname`, `player${index}lastname`);
+-    const name = `${first} ${last}`.trim();
++    const namedValue = `${first} ${last}`.trim();
++    const sheetValue = sheetNames.playerNames?.[index - 1] || "";
++    const name = sheetValue && (!first || !last) ? sheetValue : namedValue;
+     if (name) players.push(name);
+   }
+-  const existingNames = firstValue(values, "participant_names", "players");
++  const existingNames = firstValue(values, "participant_names", "players") || sheetNames.participantNames;
+   return {
+     parentFirst,
+     parentLast,
+diff --git a/mlsregistration/worker/registrant-import.js b/mlsregistration/worker/registrant-import.js
+index 01bd18c..c80e85c 100644
+--- a/mlsregistration/worker/registrant-import.js
++++ b/mlsregistration/worker/registrant-import.js
+@@ -29,6 +29,82 @@ function normalizedKey(key) {
+     .replace(/^_+|_+$/g, "");
+ }
+ 
++// The Players sheet has stable name columns even though its exported header
++// labels have changed over time. Column indexes are zero-based here.
++const PLAYERS_SHEET_NAME_COLUMNS = Object.freeze({
++  parentFirst: { letter: "AA", index: 26 },
++  parentLast: { letter: "AB", index: 27 },
++  player1First: { letter: "AN", index: 39 },
++  player1Last: { letter: "AO", index: 40 },
++  player2First: { letter: "BA", index: 52 },
++  player2Last: { letter: "BB", index: 53 },
++  player3First: { letter: "BN", index: 65 },
++  player3Last: { letter: "BO", index: 66 },
++});
++
++function sourceColumnValue(values, cells, column) {
++  const fromCells = Array.isArray(cells) ? text(cells[column.index]) : "";
++  return fromCells || first(values, column.letter, column.letter.toLowerCase());
++}
++
++export function applyPlayersSheetNameMapping(values, cells = null) {
++  const mappings = [
++    ["parent_first_name", PLAYERS_SHEET_NAME_COLUMNS.parentFirst],
++    ["parent_last_name", PLAYERS_SHEET_NAME_COLUMNS.parentLast],
++    ["player_1_first_name", PLAYERS_SHEET_NAME_COLUMNS.player1First],
++    ["player_1_last_name", PLAYERS_SHEET_NAME_COLUMNS.player1Last],
++    ["player_2_first_name", PLAYERS_SHEET_NAME_COLUMNS.player2First],
++    ["player_2_last_name", PLAYERS_SHEET_NAME_COLUMNS.player2Last],
++    ["player_3_first_name", PLAYERS_SHEET_NAME_COLUMNS.player3First],
++    ["player_3_last_name", PLAYERS_SHEET_NAME_COLUMNS.player3Last],
++  ];
++
++  for (const [target, column] of mappings) {
++    if (!first(values, target)) {
++      const value = sourceColumnValue(values, cells, column);
++      if (value) values[target] = value;
++    }
++  }
++
++  if (!first(values, "player_count", "number_of_players")) {
++    const count = [1, 2, 3].filter((index) =>
++      first(values, `player_${index}_first_name`, `player_${index}_last_name`),
++    ).length;
++    if (count) values.player_count = String(count);
++  }
++  return values;
++}
++
++function originalPayloadCells(payload) {
++  const entries = Object.entries(payload || {});
++  const originalEntries = entries.filter(([key]) => {
++    const normalized = normalizedKey(key);
++    return normalized !== key || !entries.some(([candidate]) =>
++      candidate !== key && normalizedKey(candidate) === normalized,
++    );
++  });
++  return originalEntries.map(([, value]) => text(value));
++}
++
++export function playersSheetNameFields(payload) {
++  const values = payload || {};
++  const cells = originalPayloadCells(values);
++  const read = (column) => sourceColumnValue(values, cells, column);
++  const players = [
++    [read(PLAYERS_SHEET_NAME_COLUMNS.player1First), read(PLAYERS_SHEET_NAME_COLUMNS.player1Last)],
++    [read(PLAYERS_SHEET_NAME_COLUMNS.player2First), read(PLAYERS_SHEET_NAME_COLUMNS.player2Last)],
++    [read(PLAYERS_SHEET_NAME_COLUMNS.player3First), read(PLAYERS_SHEET_NAME_COLUMNS.player3Last)],
++  ]
++    .map(([firstName, lastName]) => `${firstName} ${lastName}`.trim())
++    .filter(Boolean);
++  return {
++    parentFirst: read(PLAYERS_SHEET_NAME_COLUMNS.parentFirst),
++    parentLast: read(PLAYERS_SHEET_NAME_COLUMNS.parentLast),
++    playerNames: players,
++    participantNames: players.join("||"),
++  };
++}
++
+ function normalizeImportedValues(row) {
+   const values = {};
+   Object.entries(row || {}).forEach(([key, value]) => {
+@@ -78,6 +154,7 @@ function deriveRegistrationStatus(row, paymentStatus, agreementStatus) {
+ 
+ function normalizeRow(row) {
+   const values = normalizeImportedValues(row);
++  applyPlayersSheetNameMapping(values);
+   const submissionId = first(
+     values,
+     "registration_submission_id",
+@@ -252,8 +329,12 @@ export function parseCsv(textValue) {
+   const headers = rows.shift().map((header) => text(header));
+   return rows
+     .filter((cells) => cells.some((cell) => text(cell)))
+-    .map((cells) => headers.reduce((record, header, index) => {
+-      if (header) record[header] = text(cells[index]);
++    .map((cells) => {
++      const record = headers.reduce((result, header, index) => {
++        if (header) result[header] = text(cells[index]);
++        return result;
++      }, {});
++      applyPlayersSheetNameMapping(record, cells);
+       return record;
+-    }, {}));
++    });
+ }
+diff --git a/mlsregistration/worker/registrant-import.test.js b/mlsregistration/worker/registrant-import.test.js
+new file mode 100644
+index 0000000..fcc3c20
+--- /dev/null
++++ b/mlsregistration/worker/registrant-import.test.js
+@@ -0,0 +1,79 @@
++import assert from "node:assert/strict";
++import test from "node:test";
++import {
++  parseCsv,
++  applyPlayersSheetNameMapping,
++  playersSheetNameFields,
++} from "./registrant-import.js";
++
++function sheetRow(values) {
++  const cells = Array.from({ length: 67 }, () => "");
++  Object.entries(values).forEach(([index, value]) => {
++    cells[Number(index)] = value;
++  });
++  return cells;
++}
++
++test("maps Players sheet name columns into registration fields", () => {
++  const headers = Array.from({ length: 67 }, (_, index) => `Column ${index + 1}`);
++  const cells = sheetRow({
++    0: "submission-1",
++    26: "Jordan",
++    27: "Ligon",
++    39: "Avery",
++    40: "Ligon",
++    52: "Blake",
++    53: "Ligon",
++    65: "Casey",
++    66: "Ligon",
++  });
++  headers[0] = "Submission ID";
++  const [row] = parseCsv([headers.join(","), cells.join(",")].join("\n"));
++
++  assert.equal(row.parent_first_name, "Jordan");
++  assert.equal(row.parent_last_name, "Ligon");
++  assert.equal(row.player_1_first_name, "Avery");
++  assert.equal(row.player_1_last_name, "Ligon");
++  assert.equal(row.player_2_first_name, "Blake");
++  assert.equal(row.player_2_last_name, "Ligon");
++  assert.equal(row.player_3_first_name, "Casey");
++  assert.equal(row.player_3_last_name, "Ligon");
++  assert.equal(row.player_count, "3");
++});
++
++test("recovers fixed-column names from an existing imported payload", () => {
++  const payload = {};
++  const cells = sheetRow({
++    26: "Jordan",
++    27: "Ligon",
++    39: "Avery",
++    40: "Ligon",
++    52: "Blake",
++    53: "Ligon",
++    65: "Casey",
++    66: "Ligon",
++  });
++  cells.forEach((value, index) => { payload[`Column ${index + 1}`] = value; });
++  const names = playersSheetNameFields(payload);
++
++  assert.deepEqual(names, {
++    parentFirst: "Jordan",
++    parentLast: "Ligon",
++    playerNames: ["Avery Ligon", "Blake Ligon", "Casey Ligon"],
++    participantNames: "Avery Ligon||Blake Ligon||Casey Ligon",
++  });
++});
++
++test("does not overwrite explicit normalized names", () => {
++  const values = {
++    parent_first_name: "Explicit Parent",
++    parent_last_name: "Name",
++    player_1_first_name: "Explicit Player",
++    player_1_last_name: "Name",
++  };
++  const cells = sheetRow({ 26: "Sheet Parent", 27: "Name", 39: "Sheet Player", 40: "Name" });
++  applyPlayersSheetNameMapping(values, cells);
++
++  assert.equal(values.parent_first_name, "Explicit Parent");
++  assert.equal(values.player_1_first_name, "Explicit Player");
++});

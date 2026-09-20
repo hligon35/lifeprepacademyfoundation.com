@@ -1,0 +1,247 @@
+diff --git a/mlsregistration/admin/programs/pgs/console.html b/mlsregistration/admin/programs/pgs/console.html
+index 2698ce5..a13d49b 100644
+--- a/mlsregistration/admin/programs/pgs/console.html
++++ b/mlsregistration/admin/programs/pgs/console.html
+@@ -67,6 +67,6 @@
+     <p>We are securely checking your approved Google account before opening league operations.</p>
+   </section>
+ 
+-    <script src="/admin/programs/pgs/console.js?v=2026-09-19-6" defer></script>
++    <script src="/admin/programs/pgs/console.js?v=2026-09-20-1" defer></script>
+ </body>
+ </html>
+diff --git a/mlsregistration/admin/programs/pgs/console.js b/mlsregistration/admin/programs/pgs/console.js
+index 5ea932e..0b34296 100644
+--- a/mlsregistration/admin/programs/pgs/console.js
++++ b/mlsregistration/admin/programs/pgs/console.js
+@@ -27,7 +27,7 @@
+   }[character]));
+ 
+   const api = async (path, options = {}) => {
+-    const response = await fetch(path, Object.assign({ credentials: "include" }, options));
++    const response = await fetch(path, Object.assign({ credentials: "include", cache: "no-store" }, options));
+     const payload = await response.json().catch(() => null);
+     if (!response.ok || !payload || payload.ok === false) {
+       throw new Error(payload && payload.error ? payload.error : "Request failed");
+@@ -215,7 +215,7 @@
+           '</p><div class="actions">' + button("Manage registration", "open-registration", "button-gold") + button("Review registrants", "open-registrants", "button-quiet") + "</div></section>" +
+         '<section class="card span-4"><div class="section-head"><h2>Registration</h2>' + (status === "open" ? '<span class="pill pill-open">Open</span>' : '<span class="pill pill-closed">Closed</span>') + "</div>" +
+           '<div class="status-card"><div><strong>' + esc(status === "open" ? "Accepting new registrations" : "Not accepting public registrations") + "</strong><span class=\"muted\">" + esc(workspace.registration.submittedCount || 0) + " submitted · " + esc(workspace.registration.activeDrafts || 0) + " active drafts</span></div>" +
+-          (canManageProgram() ? button(status === "open" ? "Close registration" : "Open registration", "toggle-registration", status === "open" ? "button-danger" : "button-gold") : "") + "</div></section>" +
++          (canManageRegistration() ? button(status === "open" ? "Close registration" : "Open registration", "toggle-registration", status === "open" ? "button-danger" : "button-gold") : "") + "</div></section>" +
+         '<section class="card span-6"><div class="section-head"><h2>Hero announcement</h2>' + button("Manage", "open-announcements", "button-quiet") + "</div>" + heroMarkup + "</section>" +
+         '<section class="card span-6"><div class="section-head"><h2>Next operating actions</h2></div><div class="activity-list">' +
+           '<div class="activity"><strong>Team placement</strong><div class="activity-meta">Phase Two will add the balanced team recommendation workflow.</div></div>' +
+@@ -233,7 +233,7 @@
+   function renderRegistration() {
+     const settings = state.workspace.registration && state.workspace.registration.settings || {};
+     const status = settings.registrationStatus === "open" ? "open" : "closed";
+-    const managed = canManageProgram();
++    const managed = canManageRegistration();
+     $("#view").innerHTML =
+       pageHead("Season operations", "Registration control", "This server-side control governs the public Paducah GO registration pages while preserving draft-resume and private-access behavior.", managed ? button(status === "open" ? "Close registration" : "Open registration", "toggle-registration-page", status === "open" ? "button-danger" : "button-gold") : "") +
+       '<div class="grid">' +
+@@ -868,12 +868,19 @@
+     await renderView();
+   }
+ 
++  let registrationToggleInFlight = false;
++
+   async function toggleRegistration() {
++    if (registrationToggleInFlight) return;
+     const settings = state.workspace.registration && state.workspace.registration.settings || {};
+     const next = settings.registrationStatus === "open" ? "closed" : "open";
+     if (!window.confirm("Change Paducah GO public registration to " + next.toUpperCase() + "?")) return;
++    registrationToggleInFlight = true;
++    document.querySelectorAll("#toggle-registration, #toggle-registration-page").forEach((button) => {
++      button.disabled = true;
++    });
+     try {
+-      await api("/api/admin/registration-status?programId=" + encodeURIComponent(PROGRAM_ID), {
++      const payload = await api("/api/admin/registration-status?programId=" + encodeURIComponent(PROGRAM_ID), {
+         method: "PUT",
+         headers: { "Content-Type": "application/json" },
+         body: JSON.stringify({
+@@ -886,9 +893,16 @@
+           reopensAt: settings.reopensAt
+         })
+       });
++      if (payload.settings) {
++        state.workspace.registration = state.workspace.registration || {};
++        state.workspace.registration.settings = payload.settings;
++      }
+       showNotice("Registration is now " + next + ".");
+       await loadWorkspace(true);
+     } catch (error) { showNotice(error.message); }
++    finally {
++      registrationToggleInFlight = false;
++    }
+   }
+ 
+   async function loadSession() {
+diff --git a/mlsregistration/app.js b/mlsregistration/app.js
+index 29f3e23..3a4fe86 100644
+--- a/mlsregistration/app.js
++++ b/mlsregistration/app.js
+@@ -401,6 +401,7 @@
+   let coachingAgreementDownloadUrl = "";
+   let scholarshipDocumentUrl = "";
+   let registrationSyncWarning = "";
++  let publicConfigPromise;
+   let googleMapsApiKeyPromise;
+   let isSubmittingStage = false;
+   let registrationResumeState = null;
+@@ -421,6 +422,9 @@
+   normalizeAutofilledFieldsSoon();
+   syncAgreementPrefills();
+   updateExperienceSummaryRequirements();
++  loadPublicRegistrationConfig().catch((error) => {
++    console.warn("registration-status-load-failed", error);
++  });
+   initializeRegistrationContinuation().catch((error) => {
+     console.error("registration-resume-init-failed", error);
+     formMessage.classList.remove("form-message--loading", "form-message--success");
+@@ -3897,6 +3901,41 @@
+     validateField(input, { showMessage: false });
+   }
+ 
++  function registrationHasAuthorizedBypass() {
++    const params = new URLSearchParams(window.location.search);
++    const flow = String(params.get("flow") || "").toLowerCase();
++    return params.has("pk") || params.has("resume") || flow === "volunteer" || flow === "coach";
++  }
++
++  function applyPublicRegistrationStatus(registration) {
++    if (!registration || registrationHasAuthorizedBypass()) return;
++    const closed = String(registration.status || "closed").toLowerCase() !== "open";
++    document.documentElement.classList.toggle("registration-is-closed", closed);
++    const message = document.getElementById("registration-closed-message");
++    if (message && registration.message) message.textContent = registration.message;
++    const reopensAt = document.getElementById("registration-reopens-at");
++    if (reopensAt && registration.reopensAt) {
++      reopensAt.hidden = false;
++      reopensAt.textContent = "Registration reopens " + new Date(registration.reopensAt).toLocaleString();
++    }
++  }
++
++  function loadPublicRegistrationConfig() {
++    if (publicConfigPromise) return publicConfigPromise;
++    publicConfigPromise = fetch(PUBLIC_CONFIG_ENDPOINT, {
++      method: "GET",
++      headers: { Accept: "application/json" },
++      credentials: "omit",
++      cache: "no-store",
++    })
++      .then((response) => response.ok ? response.json() : null)
++      .then((payload) => {
++        applyPublicRegistrationStatus(payload?.registration);
++        return payload || null;
++      });
++    return publicConfigPromise;
++  }
++
+   function fetchGoogleMapsApiKey() {
+     if (googleMapsApiKeyPromise) return googleMapsApiKeyPromise;
+ 
+@@ -3906,19 +3945,11 @@
+       }
+ 
+       try {
+-        const res = await fetch(PUBLIC_CONFIG_ENDPOINT, {
+-          method: "GET",
+-          headers: { Accept: "application/json" },
+-          credentials: "omit",
+-          cache: "no-store",
+-        });
+-        if (res.ok) {
+-          const payload = await res.json().catch(() => null);
+-          const key = typeof payload?.googleMapsApiKey === "string"
+-            ? payload.googleMapsApiKey.trim()
+-            : "";
+-          if (key) return key;
+-        }
++        const payload = await loadPublicRegistrationConfig();
++        const key = typeof payload?.googleMapsApiKey === "string"
++          ? payload.googleMapsApiKey.trim()
++          : "";
++        if (key) return key;
+       } catch (_error) {
+         // Address autocomplete remains disabled when config lookup fails.
+       }
+diff --git a/mlsregistration/index.html b/mlsregistration/index.html
+index ec27c84..cf29258 100644
+--- a/mlsregistration/index.html
++++ b/mlsregistration/index.html
+@@ -96,6 +96,6 @@
+     </main>
+ 
+     <script src="./flow-logic.js?v=2026-08-27-1" defer></script>
+-    <script src="./app.js?v=2026-08-31-2" defer></script>
++    <script src="./app.js?v=2026-09-20-1" defer></script>
+   </body>
+ </html>
+diff --git a/mlsregistration/worker/index.js b/mlsregistration/worker/index.js
+index 71c9efa..c1859c5 100644
+--- a/mlsregistration/worker/index.js
++++ b/mlsregistration/worker/index.js
+@@ -185,7 +185,11 @@ export default {
+         return handleAdminAssetPage(request, env, "/admin/programs/pgs/console.html");
+       }
+       if (url.pathname === "/register" || url.pathname === "/register/") {
+-        return handleAdminAssetPage(request, env, "/index.html");
++        // The public registration form must pass through the same server-side
++        // D1 registration gate as the legacy registration root. Serving the
++        // asset directly here would leave the form visually open after an
++        // administrator closes registration.
++        return handleRegistrationLandingPage(request, env, "/index.html");
+       }
+       // The Paducah GO hostname is a route-driven application shell. Static assets
+       // continue through ASSETS; every application path resolves to the shell.
+@@ -1094,8 +1098,11 @@ async function handlePublicProgramSchedule(request, env) {
+ 
+ // Server-renders the registration landing page's open/closed shell (via HTMLRewriter) so the
+ // correct state is present in the HTML itself, not applied afterward by client JS.
+-async function handleRegistrationLandingPage(request, env) {
+-  const assetResponse = await env.ASSETS.fetch(request);
++async function handleRegistrationLandingPage(request, env, assetPath = "") {
++  const assetUrl = new URL(request.url);
++  if (assetPath) assetUrl.pathname = assetPath;
++  const assetRequest = new Request(assetUrl.toString(), request);
++  const assetResponse = await env.ASSETS.fetch(assetRequest);
+   const contentType = assetResponse.headers.get("Content-Type") || "";
+   if (!assetResponse.ok || !contentType.includes("text/html")) {
+     return assetResponse;
+diff --git a/mlsregistration/worker/registration-status.js b/mlsregistration/worker/registration-status.js
+index cc667b4..fd4395d 100644
+--- a/mlsregistration/worker/registration-status.js
++++ b/mlsregistration/worker/registration-status.js
+@@ -202,15 +202,25 @@ async function updateRegistrationSettings(env, programId, patch, actorLabel) {
+   }
+   const current = await getRegistrationSettings(env, programId);
+ 
+-  const nextStatus = patch.registrationStatus === "open" ? "open" : "closed";
+-  const nextAllowDraftResume = Boolean(patch.allowDraftResume);
+-  const nextAllowPrivateAccess = Boolean(patch.allowPrivateAccess);
++  const nextStatus = patch.registrationStatus == null
++    ? current.registrationStatus
++    : patch.registrationStatus === "open"
++      ? "open"
++      : "closed";
++  const nextAllowDraftResume = patch.allowDraftResume == null
++    ? current.allowDraftResume
++    : Boolean(patch.allowDraftResume);
++  const nextAllowPrivateAccess = patch.allowPrivateAccess == null
++    ? current.allowPrivateAccess
++    : Boolean(patch.allowPrivateAccess);
+   const nextPublicMessage =
+     patch.publicMessage != null ? String(patch.publicMessage).trim() || null : current.publicMessage;
+   const nextClosedMessage = patch.closedMessage
+     ? String(patch.closedMessage).trim()
+     : current.closedMessage;
+-  const nextReopensAt = patch.reopensAt ? String(patch.reopensAt).trim() : null;
++  const nextReopensAt = Object.prototype.hasOwnProperty.call(patch, "reopensAt")
++    ? String(patch.reopensAt || "").trim() || null
++    : current.reopensAt;
+ 
+   let nextPrivateAccessTokenHash = current.privateAccessTokenHash;
+   if (patch.newPrivateAccessToken) {
