@@ -2,7 +2,11 @@ import { adminError, getAdminContext, normalizeProgram } from "./admin-auth.js";
 import { getRegistrationOverview } from "./registration-status.js";
 import { handleOperationsApi } from "./operations-api.js";
 import { handleCommerceApi } from "./commerce-api.js";
-import { importSheetRegistrants, parseCsv } from "./registrant-import.js";
+import {
+  importSheetRegistrants,
+  parseCsv,
+  playersSheetNameFields,
+} from "./registrant-import.js";
 
 
 const PROGRAM_MANAGER_ROLES = new Set(["super_admin", "program_administrator"]);
@@ -163,7 +167,9 @@ async function listRegistrants(request, env, context) {
     const agreementPlyrComplete = Number(row.agreement_plyr_complete) === 1;
     const parentFirst = text(row.parent_first_name) || fallback.parentFirst;
     const parentLast = text(row.parent_last_name) || fallback.parentLast;
-    const participantNames = text(row.participant_names) || fallback.participantNames;
+    // Prefer the complete names recovered from the imported sheet payload.
+    // Older imports may have stored only last names in registration_participants.
+    const participantNames = fallback.participantNames || text(row.participant_names);
     const { raw_payload_json: _rawPayload, ...safeRow } = row;
     return {
       ...safeRow,
@@ -435,16 +441,19 @@ function registrationNameFallback(rawPayload) {
     return { parentFirst: "", parentLast: "", participantNames: "" };
   }
   const values = normalizedPayload(parsed);
-  const parentFirst = firstValue(values, "parent_first_name", "parent_guardian_first_name", "guardian_first_name");
-  const parentLast = firstValue(values, "parent_last_name", "parent_guardian_last_name", "guardian_last_name");
+  const sheetNames = playersSheetNameFields(parsed);
+  const parentFirst = firstValue(values, "parent_first_name", "parent_guardian_first_name", "guardian_first_name") || sheetNames.parentFirst;
+  const parentLast = firstValue(values, "parent_last_name", "parent_guardian_last_name", "guardian_last_name") || sheetNames.parentLast;
   const players = [];
   for (let index = 1; index <= 4; index += 1) {
     const first = firstValue(values, `player_${index}_first_name`, `player${index}_first_name`, `player_${index}_firstname`, `player${index}firstname`);
     const last = firstValue(values, `player_${index}_last_name`, `player${index}_last_name`, `player_${index}_lastname`, `player${index}lastname`);
-    const name = `${first} ${last}`.trim();
+    const namedValue = `${first} ${last}`.trim();
+    const sheetValue = sheetNames.playerNames?.[index - 1] || "";
+    const name = sheetValue && (!first || !last) ? sheetValue : namedValue;
     if (name) players.push(name);
   }
-  const existingNames = firstValue(values, "participant_names", "players");
+  const existingNames = firstValue(values, "participant_names", "players") || sheetNames.participantNames;
   return {
     parentFirst,
     parentLast,

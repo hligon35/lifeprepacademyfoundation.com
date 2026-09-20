@@ -29,6 +29,82 @@ function normalizedKey(key) {
     .replace(/^_+|_+$/g, "");
 }
 
+// The Players sheet has stable name columns even though its exported header
+// labels have changed over time. Column indexes are zero-based here.
+const PLAYERS_SHEET_NAME_COLUMNS = Object.freeze({
+  parentFirst: { letter: "AA", index: 26 },
+  parentLast: { letter: "AB", index: 27 },
+  player1First: { letter: "AN", index: 39 },
+  player1Last: { letter: "AO", index: 40 },
+  player2First: { letter: "BA", index: 52 },
+  player2Last: { letter: "BB", index: 53 },
+  player3First: { letter: "BN", index: 65 },
+  player3Last: { letter: "BO", index: 66 },
+});
+
+function sourceColumnValue(values, cells, column) {
+  const fromCells = Array.isArray(cells) ? text(cells[column.index]) : "";
+  return fromCells || first(values, column.letter, column.letter.toLowerCase());
+}
+
+export function applyPlayersSheetNameMapping(values, cells = null) {
+  const mappings = [
+    ["parent_first_name", PLAYERS_SHEET_NAME_COLUMNS.parentFirst],
+    ["parent_last_name", PLAYERS_SHEET_NAME_COLUMNS.parentLast],
+    ["player_1_first_name", PLAYERS_SHEET_NAME_COLUMNS.player1First],
+    ["player_1_last_name", PLAYERS_SHEET_NAME_COLUMNS.player1Last],
+    ["player_2_first_name", PLAYERS_SHEET_NAME_COLUMNS.player2First],
+    ["player_2_last_name", PLAYERS_SHEET_NAME_COLUMNS.player2Last],
+    ["player_3_first_name", PLAYERS_SHEET_NAME_COLUMNS.player3First],
+    ["player_3_last_name", PLAYERS_SHEET_NAME_COLUMNS.player3Last],
+  ];
+
+  for (const [target, column] of mappings) {
+    if (!first(values, target)) {
+      const value = sourceColumnValue(values, cells, column);
+      if (value) values[target] = value;
+    }
+  }
+
+  if (!first(values, "player_count", "number_of_players")) {
+    const count = [1, 2, 3].filter((index) =>
+      first(values, `player_${index}_first_name`, `player_${index}_last_name`),
+    ).length;
+    if (count) values.player_count = String(count);
+  }
+  return values;
+}
+
+function originalPayloadCells(payload) {
+  const entries = Object.entries(payload || {});
+  const originalEntries = entries.filter(([key]) => {
+    const normalized = normalizedKey(key);
+    return normalized !== key || !entries.some(([candidate]) =>
+      candidate !== key && normalizedKey(candidate) === normalized,
+    );
+  });
+  return originalEntries.map(([, value]) => text(value));
+}
+
+export function playersSheetNameFields(payload) {
+  const values = payload || {};
+  const cells = originalPayloadCells(values);
+  const read = (column) => sourceColumnValue(values, cells, column);
+  const players = [
+    [read(PLAYERS_SHEET_NAME_COLUMNS.player1First), read(PLAYERS_SHEET_NAME_COLUMNS.player1Last)],
+    [read(PLAYERS_SHEET_NAME_COLUMNS.player2First), read(PLAYERS_SHEET_NAME_COLUMNS.player2Last)],
+    [read(PLAYERS_SHEET_NAME_COLUMNS.player3First), read(PLAYERS_SHEET_NAME_COLUMNS.player3Last)],
+  ]
+    .map(([firstName, lastName]) => `${firstName} ${lastName}`.trim())
+    .filter(Boolean);
+  return {
+    parentFirst: read(PLAYERS_SHEET_NAME_COLUMNS.parentFirst),
+    parentLast: read(PLAYERS_SHEET_NAME_COLUMNS.parentLast),
+    playerNames: players,
+    participantNames: players.join("||"),
+  };
+}
+
 function normalizeImportedValues(row) {
   const values = {};
   Object.entries(row || {}).forEach(([key, value]) => {
@@ -78,6 +154,7 @@ function deriveRegistrationStatus(row, paymentStatus, agreementStatus) {
 
 function normalizeRow(row) {
   const values = normalizeImportedValues(row);
+  applyPlayersSheetNameMapping(values);
   const submissionId = first(
     values,
     "registration_submission_id",
@@ -252,8 +329,12 @@ export function parseCsv(textValue) {
   const headers = rows.shift().map((header) => text(header));
   return rows
     .filter((cells) => cells.some((cell) => text(cell)))
-    .map((cells) => headers.reduce((record, header, index) => {
-      if (header) record[header] = text(cells[index]);
+    .map((cells) => {
+      const record = headers.reduce((result, header, index) => {
+        if (header) result[header] = text(cells[index]);
+        return result;
+      }, {});
+      applyPlayersSheetNameMapping(record, cells);
       return record;
-    }, {}));
+    });
 }
