@@ -1,0 +1,74 @@
+diff --git a/mlsregistration/admin/programs/pgs/console.js b/mlsregistration/admin/programs/pgs/console.js
+index 5ea932e..cf2f49e 100644
+--- a/mlsregistration/admin/programs/pgs/console.js
++++ b/mlsregistration/admin/programs/pgs/console.js
+@@ -215,7 +215,7 @@
+           '</p><div class="actions">' + button("Manage registration", "open-registration", "button-gold") + button("Review registrants", "open-registrants", "button-quiet") + "</div></section>" +
+         '<section class="card span-4"><div class="section-head"><h2>Registration</h2>' + (status === "open" ? '<span class="pill pill-open">Open</span>' : '<span class="pill pill-closed">Closed</span>') + "</div>" +
+           '<div class="status-card"><div><strong>' + esc(status === "open" ? "Accepting new registrations" : "Not accepting public registrations") + "</strong><span class="muted">" + esc(workspace.registration.submittedCount || 0) + " submitted · " + esc(workspace.registration.activeDrafts || 0) + " active drafts</span></div>" +
+-          (canManageProgram() ? button(status === "open" ? "Close registration" : "Open registration", "toggle-registration", status === "open" ? "button-danger" : "button-gold") : "") + "</div></section>" +
++          (canManageRegistration() ? button(status === "open" ? "Close registration" : "Open registration", "toggle-registration", status === "open" ? "button-danger" : "button-gold") : "") + "</div></section>" +
+         '<section class="card span-6"><div class="section-head"><h2>Hero announcement</h2>' + button("Manage", "open-announcements", "button-quiet") + "</div>" + heroMarkup + "</section>" +
+         '<section class="card span-6"><div class="section-head"><h2>Next operating actions</h2></div><div class="activity-list">' +
+           '<div class="activity"><strong>Team placement</strong><div class="activity-meta">Phase Two will add the balanced team recommendation workflow.</div></div>' +
+@@ -233,7 +233,7 @@
+   function renderRegistration() {
+     const settings = state.workspace.registration && state.workspace.registration.settings || {};
+     const status = settings.registrationStatus === "open" ? "open" : "closed";
+-    const managed = canManageProgram();
++    const managed = canManageRegistration();
+     $("#view").innerHTML =
+       pageHead("Season operations", "Registration control", "This server-side control governs the public Paducah GO registration pages while preserving draft-resume and private-access behavior.", managed ? button(status === "open" ? "Close registration" : "Open registration", "toggle-registration-page", status === "open" ? "button-danger" : "button-gold") : "") +
+       '<div class="grid">' +
+@@ -873,7 +873,7 @@
+     const next = settings.registrationStatus === "open" ? "closed" : "open";
+     if (!window.confirm("Change Paducah GO public registration to " + next.toUpperCase() + "?")) return;
+     try {
+-      await api("/api/admin/registration-status?programId=" + encodeURIComponent(PROGRAM_ID), {
++      const payload = await api("/api/admin/registration-status?programId=" + encodeURIComponent(PROGRAM_ID), {
+         method: "PUT",
+         headers: { "Content-Type": "application/json" },
+         body: JSON.stringify({
+@@ -886,6 +886,10 @@
+           reopensAt: settings.reopensAt
+         })
+       });
++      if (payload.settings) {
++        state.workspace.registration = state.workspace.registration || {};
++        state.workspace.registration.settings = payload.settings;
++      }
+       showNotice("Registration is now " + next + ".");
+       await loadWorkspace(true);
+     } catch (error) { showNotice(error.message); }
+diff --git a/mlsregistration/worker/index.js b/mlsregistration/worker/index.js
+index 71c9efa..c1859c5 100644
+--- a/mlsregistration/worker/index.js
++++ b/mlsregistration/worker/index.js
+@@ -185,7 +185,11 @@ export default {
+         return handleAdminAssetPage(request, env, "/admin/programs/pgs/console.html");
+       }
+       if (url.pathname === "/register" || url.pathname === "/register/") {
+-        return handleAdminAssetPage(request, env, "/index.html");
++        // The public registration form must pass through the same server-side
++        // D1 registration gate as the legacy registration root. Serving the
++        // asset directly here would leave the form visually open after an
++        // administrator closes registration.
++        return handleRegistrationLandingPage(request, env, "/index.html");
+       }
+       // The Paducah GO hostname is a route-driven application shell. Static assets
+       // continue through ASSETS; every application path resolves to the shell.
+@@ -1094,8 +1098,11 @@ async function handlePublicProgramSchedule(request, env) {
+ 
+ // Server-renders the registration landing page's open/closed shell (via HTMLRewriter) so the
+ // correct state is present in the HTML itself, not applied afterward by client JS.
+-async function handleRegistrationLandingPage(request, env) {
+-  const assetResponse = await env.ASSETS.fetch(request);
++async function handleRegistrationLandingPage(request, env, assetPath = "") {
++  const assetUrl = new URL(request.url);
++  if (assetPath) assetUrl.pathname = assetPath;
++  const assetRequest = new Request(assetUrl.toString(), request);
++  const assetResponse = await env.ASSETS.fetch(assetRequest);
+   const contentType = assetResponse.headers.get("Content-Type") || "";
+   if (!assetResponse.ok || !contentType.includes("text/html")) {
+     return assetResponse;
+

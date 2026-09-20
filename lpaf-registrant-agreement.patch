@@ -1,0 +1,169 @@
+From db3d1b6f9cfa0998bf18990ca96963003f4c6271 Mon Sep 17 00:00:00 2001
+From: Codex <codex@openai.com>
+Date: Sun, 20 Sep 2026 01:53:06 +0200
+Subject: [PATCH] Add registrant agreement status display
+
+---
+ .../admin/programs/pgs/console.css            |  2 +
+ mlsregistration/admin/programs/pgs/console.js | 42 ++++++++++++++++++-
+ mlsregistration/app.js                        |  1 +
+ mlsregistration/worker/admin-api.js           | 16 ++++++-
+ mlsregistration/worker/registrant-import.js   | 26 ++++++++++++
+ 5 files changed, 83 insertions(+), 4 deletions(-)
+
+diff --git a/mlsregistration/admin/programs/pgs/console.css b/mlsregistration/admin/programs/pgs/console.css
+index 4d6ce15..1532152 100644
+--- a/mlsregistration/admin/programs/pgs/console.css
++++ b/mlsregistration/admin/programs/pgs/console.css
+@@ -5,6 +5,8 @@
+ @media(max-width:720px){.topbar{align-items:flex-start;flex-direction:column}.account{width:100%;justify-content:space-between}.shell{display:block}.sidebar{width:100%;padding:14px 12px;border-right:0;border-bottom:1px solid var(--line)}.sidebar nav{display:flex;overflow:auto}.nav-item{width:auto;white-space:nowrap}.sidebar-foot{display:flex;margin-top:0;padding:4px 10px}.page-head,.section-head{align-items:flex-start;flex-direction:column}.metric-grid{grid-template-columns:repeat(2,1fr)}.form-grid{grid-template-columns:1fr}.field.full{grid-column:auto}.announcement{grid-template-columns:1fr}.announcement-side{text-align:left}.assignment{align-items:flex-start;flex-direction:column}}
+ @media(max-width:460px){.metric-grid{grid-template-columns:1fr}.main{padding:20px 14px}.brand img{width:40px;height:40px}}
+ 
++.registrant-players{display:grid;gap:4px;min-width:150px;max-width:220px;max-height:calc(1.3em * 3 + 8px);overflow-y:auto;padding-right:4px}.registrant-player{overflow:hidden;line-height:1.3;white-space:nowrap;text-overflow:ellipsis}.registrant-agreements{display:grid;gap:4px;min-width:92px}.registrant-agreement-row{display:flex;align-items:center;gap:6px;font-size:.78rem;font-weight:800;line-height:1.3}.agreement-indicator{width:7px;height:7px;flex:0 0 7px;border-radius:50%}.agreement-indicator-complete{background:var(--good);box-shadow:0 0 0 2px #e7f6ee}.agreement-indicator-missing{background:var(--danger);box-shadow:0 0 0 2px #fdecec}.registrant-agreement-count{margin-top:2px;color:var(--muted);font-size:.72rem;font-weight:750}.pill-scholarship{color:#7c3aed;background:#f1e9ff}
++
+ .result-entry{display:flex;align-items:center;gap:6px;margin-top:8px}.result-entry .form-control{width:58px;min-width:0;padding:6px}.result-entry .button{min-height:32px;padding:6px 9px;font-size:.75rem}
+ .template-section{margin-top:16px}.template-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:16px 0 22px}.template-card{padding:15px;border:1px solid var(--line);border-radius:12px;background:#fbfcfe}.template-card>div{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}.template-card strong{color:var(--purple)}.template-card span,.template-card p,.template-meta{color:var(--muted);font-size:.78rem}.template-card p{margin:9px 0}.template-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:22px;padding-top:20px;border-top:1px solid var(--line)}
+ @media(max-width:720px){.template-list,.template-actions{grid-template-columns:1fr}}
+diff --git a/mlsregistration/admin/programs/pgs/console.js b/mlsregistration/admin/programs/pgs/console.js
+index 35681a2..5ea932e 100644
+--- a/mlsregistration/admin/programs/pgs/console.js
++++ b/mlsregistration/admin/programs/pgs/console.js
+@@ -47,6 +47,44 @@
+     return Number.isNaN(parsed.getTime()) ? String(value) : parsed.toLocaleDateString([], { dateStyle: "medium" });
+   };
+ 
++  const formatRegistrantPlayers = (value) => {
++    const players = String(value || "")
++      .split("||")
++      .map((name) => name.trim())
++      .filter(Boolean);
++    return players.length ? players : ["—"];
++  };
++
++  const renderRegistrantPlayers = (value) => {
++    const players = formatRegistrantPlayers(value);
++    return '<div class="registrant-players" title="' + esc(players.join(", ")) + '" aria-label="' + esc(players.join(", ")) + '">' +
++      players.map((name) => '<div class="registrant-player">' + esc(name) + '</div>').join("") +
++      '</div>';
++  };
++
++  const renderScholarship = (row) => {
++    const requested = Number(row.scholarship_requested) === 1 || row.status === "scholarship_pending";
++    return requested
++      ? '<span class="pill pill-scholarship">Requested</span>'
++      : '<span class="muted">—</span>';
++  };
++
++  const renderAgreementState = (label, complete) =>
++    '<div class="registrant-agreement-row" title="' + esc(label + (complete ? " complete" : " missing")) + '">' +
++      '<span class="agreement-indicator ' + (complete ? "agreement-indicator-complete" : "agreement-indicator-missing") + '" aria-hidden="true"></span>' +
++      '<span>' + esc(label) + '</span>' +
++    '</div>';
++
++  const renderAgreements = (row) => {
++    const received = Number(row.agreements_received) || 0;
++    return '<div class="registrant-agreements" aria-label="' + received + ' of 3 agreements received">' +
++      renderAgreementState("LPAF", row.agreement_lpaf_complete) +
++      renderAgreementState("MEDIA", row.agreement_media_complete) +
++      renderAgreementState("PLYR", row.agreement_plyr_complete) +
++      '<div class="registrant-agreement-count">' + received + '/3 received</div>' +
++      '</div>';
++  };
++
+   const showNotice = (message) => {
+     const node = $("#notice");
+     if (!node) return;
+@@ -238,8 +276,8 @@
+       list.innerHTML = empty("No registrants found", "Try another status or search term.");
+       return;
+     }
+-    list.innerHTML = '<div class="table-wrap"><table class="data-table"><thead><tr><th>Family</th><th>Player(s)</th><th>Status</th><th>Payment</th><th>Agreement</th><th>Submitted</th></tr></thead><tbody>' +
+-      state.registrants.map((row) => "<tr><td><strong>" + esc((row.parent_first_name || "") + " " + (row.parent_last_name || "")) + "</strong><br><span class=\"muted\">" + esc(row.parent_email) + "</span></td><td>" + esc(row.participant_names || "—") + "</td><td>" + esc(row.status) + "</td><td>" + esc(row.payment_status || "unpaid") + "</td><td>" + esc(row.agreement_status || "pending") + "</td><td>" + esc(formatDate(row.submitted_at || row.created_at)) + "</td></tr>").join("") +
++    list.innerHTML = '<div class="table-wrap"><table class="data-table"><thead><tr><th>Family</th><th>Player(s)</th><th>Scholarship</th><th>Status</th><th>Payment</th><th>Agreement</th><th>Submitted</th></tr></thead><tbody>' +
++      state.registrants.map((row) => "<tr><td><strong>" + esc(((row.parent_first_name || "") + " " + (row.parent_last_name || "")).trim() || "—") + "</strong><br><span class=\"muted\">" + esc(row.parent_email || "") + "</span></td><td>" + renderRegistrantPlayers(row.participant_names) + "</td><td>" + renderScholarship(row) + "</td><td>" + esc(row.status) + "</td><td>" + esc(row.payment_status || "unpaid") + "</td><td>" + renderAgreements(row) + "</td><td>" + esc(formatDate(row.submitted_at || row.created_at)) + "</td></tr>").join("") +
+       "</tbody></table></div>";
+   }
+ 
+diff --git a/mlsregistration/app.js b/mlsregistration/app.js
+index 154fa3a..29f3e23 100644
+--- a/mlsregistration/app.js
++++ b/mlsregistration/app.js
+@@ -3667,6 +3667,7 @@
+       player_count: String(data.players.length),
+       scholarship_requested: String(data.scholarship?.requested || "No"),
+       help_choice: data.helpChoice,
++      agree_ppf_liability: data.agreements.liability ? "yes" : "no",
+       agree_waiver: data.agreements.waiver ? "yes" : "no",
+       agree_privacy: data.agreements.privacy ? "yes" : "no",
+       agree_marketing: data.agreements.marketing ? "yes" : "no",
+diff --git a/mlsregistration/worker/admin-api.js b/mlsregistration/worker/admin-api.js
+index fdac1e5..ebdce08 100644
+--- a/mlsregistration/worker/admin-api.js
++++ b/mlsregistration/worker/admin-api.js
+@@ -154,12 +154,24 @@ async function listRegistrants(request, env, context) {
+     values.push(needle, needle, needle);
+   }
+   const rows = await env.DB.prepare(
+-    "SELECT r.id, r.submission_id, r.registration_type, r.status, r.payment_status, r.agreement_status, r.parent_first_name, r.parent_last_name, r.parent_email, r.created_at, r.submitted_at, COUNT(p.id) AS participant_count, COALESCE(GROUP_CONCAT(TRIM(COALESCE(p.first_name, '') || ' ' || COALESCE(p.last_name, '')), ', '), '') AS participant_names FROM registrations r LEFT JOIN registration_participants p ON p.registration_id = r.id WHERE " + where.join(" AND ") + " GROUP BY r.id ORDER BY r.created_at DESC LIMIT ?",
++    "SELECT r.id, r.submission_id, r.registration_type, r.status, r.payment_status, r.agreement_status, r.scholarship_requested, r.parent_first_name, r.parent_last_name, r.parent_email, r.created_at, r.submitted_at, COUNT(CASE WHEN p.participant_type = 'player' THEN p.id END) AS participant_count, COALESCE((SELECT GROUP_CONCAT(player_name, '||') FROM (SELECT TRIM(COALESCE(p2.first_name, '') || ' ' || COALESCE(p2.last_name, '')) AS player_name FROM registration_participants p2 WHERE p2.registration_id = r.id AND p2.participant_type = 'player' AND TRIM(COALESCE(p2.first_name, '') || ' ' || COALESCE(p2.last_name, '')) <> '' ORDER BY p2.slot_index ASC, p2.created_at ASC)), '') AS participant_names, CASE WHEN (EXISTS (SELECT 1 FROM registration_documents d WHERE d.registration_id = r.id AND d.document_type = 'ppf_liability' AND d.status IN ('generated', 'viewed')) OR LOWER(COALESCE(json_extract(r.raw_payload_json, '$.agree_ppf_liability'), '')) IN ('yes', 'true', '1', 'on')) THEN 1 ELSE 0 END AS agreement_lpaf_complete, CASE WHEN (LOWER(COALESCE(json_extract(r.raw_payload_json, '$.agree_marketing'), '')) IN ('yes', 'true', '1', 'on') OR LOWER(COALESCE(json_extract(r.raw_payload_json, '$.agree_privacy'), '')) IN ('yes', 'true', '1', 'on')) THEN 1 ELSE 0 END AS agreement_media_complete, CASE WHEN (EXISTS (SELECT 1 FROM registration_documents d WHERE d.registration_id = r.id AND d.document_type = 'player_agreement' AND d.status IN ('generated', 'viewed')) OR LOWER(COALESCE(r.agreement_status, '')) IN ('complete', 'completed', 'signed', 'generated', 'viewed')) THEN 1 ELSE 0 END AS agreement_plyr_complete FROM registrations r LEFT JOIN registration_participants p ON p.registration_id = r.id WHERE " + where.join(" AND ") + " GROUP BY r.id ORDER BY r.created_at DESC LIMIT ?",
+   ).bind(...values, limit).all();
++  const registrants = (rows.results || []).map((row) => {
++    const agreementLpafComplete = Number(row.agreement_lpaf_complete) === 1;
++    const agreementMediaComplete = Number(row.agreement_media_complete) === 1;
++    const agreementPlyrComplete = Number(row.agreement_plyr_complete) === 1;
++    return {
++      ...row,
++      agreement_lpaf_complete: agreementLpafComplete,
++      agreement_media_complete: agreementMediaComplete,
++      agreement_plyr_complete: agreementPlyrComplete,
++      agreements_received: [agreementLpafComplete, agreementMediaComplete, agreementPlyrComplete].filter(Boolean).length,
++    };
++  });
+   const counts = await env.DB.prepare(
+     "SELECT status, COUNT(*) AS count FROM registrations WHERE program_id = ? GROUP BY status ORDER BY status",
+   ).bind(programId).all();
+-  return json({ ok: true, registrants: rows.results || [], counts: counts.results || [], viewer: context.user });
++  return json({ ok: true, registrants, counts: counts.results || [], viewer: context.user });
+ }
+ 
+ async function importRegistrants(request, env, context) {
+diff --git a/mlsregistration/worker/registrant-import.js b/mlsregistration/worker/registrant-import.js
+index 750d18b..37ee2fc 100644
+--- a/mlsregistration/worker/registrant-import.js
++++ b/mlsregistration/worker/registrant-import.js
+@@ -71,6 +71,32 @@ function normalizeRow(row) {
+   if (submissionId && !values.registration_submission_id) {
+     values.registration_submission_id = submissionId;
+   }
++  const scholarshipRequested = first(
++    values,
++    "scholarship_requested",
++    "Scholarship Requested",
++    "scholarshipRequested",
++    "Scholarship",
++  );
++  if (scholarshipRequested && !values.scholarship_requested) {
++    values.scholarship_requested = scholarshipRequested;
++  }
++  const lpafStatus = first(
++    values,
++    "agree_ppf_liability",
++    "PPF Liability Status",
++    "ppf_liability_status",
++  ).toLowerCase();
++  const lpafFile = first(
++    values,
++    "PPF Liability File ID",
++    "PPF Liability PDF URL",
++    "ppf_liability_file_id",
++    "ppf_liability_pdf_url",
++  );
++  if (!values.agree_ppf_liability && (lpafFile || /yes|true|signed|complete|generated|viewed/.test(lpafStatus))) {
++    values.agree_ppf_liability = "yes";
++  }
+   if (!values.form_type) values.form_type = "mls_registration";
+   return { values, submissionId };
+ }
+-- 
+2.51.1
+
