@@ -154,14 +154,22 @@ async function listRegistrants(request, env, context) {
     values.push(needle, needle, needle);
   }
   const rows = await env.DB.prepare(
-    "SELECT r.id, r.submission_id, r.registration_type, r.status, r.payment_status, r.agreement_status, r.scholarship_requested, r.parent_first_name, r.parent_last_name, r.parent_email, r.created_at, r.submitted_at, COUNT(CASE WHEN p.participant_type = 'player' THEN p.id END) AS participant_count, COALESCE((SELECT GROUP_CONCAT(player_name, '||') FROM (SELECT TRIM(COALESCE(p2.first_name, '') || ' ' || COALESCE(p2.last_name, '')) AS player_name FROM registration_participants p2 WHERE p2.registration_id = r.id AND p2.participant_type = 'player' AND TRIM(COALESCE(p2.first_name, '') || ' ' || COALESCE(p2.last_name, '')) <> '' ORDER BY p2.slot_index ASC, p2.created_at ASC)), '') AS participant_names, CASE WHEN (EXISTS (SELECT 1 FROM registration_documents d WHERE d.registration_id = r.id AND d.document_type = 'ppf_liability' AND d.status IN ('generated', 'viewed')) OR LOWER(COALESCE(json_extract(r.raw_payload_json, '$.agree_ppf_liability'), '')) IN ('yes', 'true', '1', 'on')) THEN 1 ELSE 0 END AS agreement_lpaf_complete, CASE WHEN (LOWER(COALESCE(json_extract(r.raw_payload_json, '$.agree_marketing'), '')) IN ('yes', 'true', '1', 'on') OR LOWER(COALESCE(json_extract(r.raw_payload_json, '$.agree_privacy'), '')) IN ('yes', 'true', '1', 'on')) THEN 1 ELSE 0 END AS agreement_media_complete, CASE WHEN (EXISTS (SELECT 1 FROM registration_documents d WHERE d.registration_id = r.id AND d.document_type = 'player_agreement' AND d.status IN ('generated', 'viewed')) OR LOWER(COALESCE(r.agreement_status, '')) IN ('complete', 'completed', 'signed', 'generated', 'viewed')) THEN 1 ELSE 0 END AS agreement_plyr_complete FROM registrations r LEFT JOIN registration_participants p ON p.registration_id = r.id WHERE " + where.join(" AND ") + " GROUP BY r.id ORDER BY r.created_at DESC LIMIT ?",
+    "SELECT r.id, r.submission_id, r.registration_type, r.status, r.payment_status, r.agreement_status, r.scholarship_requested, r.parent_first_name, r.parent_last_name, r.parent_email, r.raw_payload_json, r.created_at, r.submitted_at, COUNT(CASE WHEN p.participant_type = 'player' THEN p.id END) AS participant_count, COALESCE((SELECT GROUP_CONCAT(player_name, '||') FROM (SELECT TRIM(COALESCE(p2.first_name, '') || ' ' || COALESCE(p2.last_name, '')) AS player_name FROM registration_participants p2 WHERE p2.registration_id = r.id AND p2.participant_type = 'player' AND TRIM(COALESCE(p2.first_name, '') || ' ' || COALESCE(p2.last_name, '')) <> '' ORDER BY p2.slot_index ASC, p2.created_at ASC)), '') AS participant_names, CASE WHEN (EXISTS (SELECT 1 FROM registration_documents d WHERE d.registration_id = r.id AND d.document_type = 'ppf_liability' AND d.status IN ('generated', 'viewed')) OR LOWER(COALESCE(json_extract(r.raw_payload_json, '$.agree_ppf_liability'), '')) IN ('yes', 'true', '1', 'on')) THEN 1 ELSE 0 END AS agreement_lpaf_complete, CASE WHEN (LOWER(COALESCE(json_extract(r.raw_payload_json, '$.agree_marketing'), '')) IN ('yes', 'true', '1', 'on') OR LOWER(COALESCE(json_extract(r.raw_payload_json, '$.agree_privacy'), '')) IN ('yes', 'true', '1', 'on')) THEN 1 ELSE 0 END AS agreement_media_complete, CASE WHEN (EXISTS (SELECT 1 FROM registration_documents d WHERE d.registration_id = r.id AND d.document_type = 'player_agreement' AND d.status IN ('generated', 'viewed')) OR LOWER(COALESCE(r.agreement_status, '')) IN ('complete', 'completed', 'signed', 'generated', 'viewed')) THEN 1 ELSE 0 END AS agreement_plyr_complete FROM registrations r LEFT JOIN registration_participants p ON p.registration_id = r.id WHERE " + where.join(" AND ") + " GROUP BY r.id ORDER BY r.created_at DESC LIMIT ?",
   ).bind(...values, limit).all();
   const registrants = (rows.results || []).map((row) => {
+    const fallback = registrationNameFallback(row.raw_payload_json);
     const agreementLpafComplete = Number(row.agreement_lpaf_complete) === 1;
     const agreementMediaComplete = Number(row.agreement_media_complete) === 1;
     const agreementPlyrComplete = Number(row.agreement_plyr_complete) === 1;
+    const parentFirst = text(row.parent_first_name) || fallback.parentFirst;
+    const parentLast = text(row.parent_last_name) || fallback.parentLast;
+    const participantNames = text(row.participant_names) || fallback.participantNames;
+    const { raw_payload_json: _rawPayload, ...safeRow } = row;
     return {
-      ...row,
+      ...safeRow,
+      parent_first_name: parentFirst,
+      parent_last_name: parentLast,
+      participant_names: participantNames,
       agreement_lpaf_complete: agreementLpafComplete,
       agreement_media_complete: agreementMediaComplete,
       agreement_plyr_complete: agreementPlyrComplete,
@@ -392,6 +400,58 @@ function json(data, status = 200) {
 
 function text(value) {
   return value === undefined || value === null ? "" : String(value).trim();
+}
+
+function normalizedKey(key) {
+  return text(key)
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+}
+
+function normalizedPayload(payload) {
+  const values = {};
+  Object.entries(payload || {}).forEach(([key, value]) => {
+    values[key] = value;
+    const normalized = normalizedKey(key);
+    if (normalized && values[normalized] === undefined) values[normalized] = value;
+  });
+  return values;
+}
+
+function firstValue(values, ...keys) {
+  for (const key of keys) {
+    const value = text(values?.[key] ?? values?.[normalizedKey(key)]);
+    if (value) return value;
+  }
+  return "";
+}
+
+function registrationNameFallback(rawPayload) {
+  let parsed;
+  try {
+    parsed = typeof rawPayload === "string" ? JSON.parse(rawPayload) : rawPayload;
+  } catch {
+    return { parentFirst: "", parentLast: "", participantNames: "" };
+  }
+  const values = normalizedPayload(parsed);
+  const parentFirst = firstValue(values, "parent_first_name", "parent_guardian_first_name", "guardian_first_name");
+  const parentLast = firstValue(values, "parent_last_name", "parent_guardian_last_name", "guardian_last_name");
+  const players = [];
+  for (let index = 1; index <= 4; index += 1) {
+    const first = firstValue(values, `player_${index}_first_name`, `player${index}_first_name`, `player_${index}_firstname`, `player${index}firstname`);
+    const last = firstValue(values, `player_${index}_last_name`, `player${index}_last_name`, `player_${index}_lastname`, `player${index}lastname`);
+    const name = `${first} ${last}`.trim();
+    if (name) players.push(name);
+  }
+  const existingNames = firstValue(values, "participant_names", "players");
+  return {
+    parentFirst,
+    parentLast,
+    participantNames: players.length
+      ? players.join("||")
+      : existingNames.split(/\s*\|\|\s*|\s*,\s*/).filter(Boolean).join("||"),
+  };
 }
 
 function canAccessProgram(context, programId) {

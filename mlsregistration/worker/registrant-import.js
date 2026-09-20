@@ -22,6 +22,23 @@ function first(row, ...keys) {
   return "";
 }
 
+function normalizedKey(key) {
+  return text(key)
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+}
+
+function normalizeImportedValues(row) {
+  const values = {};
+  Object.entries(row || {}).forEach(([key, value]) => {
+    values[key] = value;
+    const normalized = normalizedKey(key);
+    if (normalized && values[normalized] === undefined) values[normalized] = value;
+  });
+  return values;
+}
+
 function normalizedStatus(value) {
   return text(value).toLowerCase().replace(/[\s-]+/g, "_");
 }
@@ -60,7 +77,7 @@ function deriveRegistrationStatus(row, paymentStatus, agreementStatus) {
 }
 
 function normalizeRow(row) {
-  const values = { ...(row || {}) };
+  const values = normalizeImportedValues(row);
   const submissionId = first(
     values,
     "registration_submission_id",
@@ -71,6 +88,20 @@ function normalizeRow(row) {
   if (submissionId && !values.registration_submission_id) {
     values.registration_submission_id = submissionId;
   }
+  const parentFirst = first(
+    values,
+    "parent_first_name",
+    "parent_guardian_first_name",
+    "guardian_first_name",
+  );
+  const parentLast = first(
+    values,
+    "parent_last_name",
+    "parent_guardian_last_name",
+    "guardian_last_name",
+  );
+  if (parentFirst && !values.parent_first_name) values.parent_first_name = parentFirst;
+  if (parentLast && !values.parent_last_name) values.parent_last_name = parentLast;
   const scholarshipRequested = first(
     values,
     "scholarship_requested",
