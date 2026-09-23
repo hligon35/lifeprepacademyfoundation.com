@@ -122,21 +122,6 @@ The public payment config shape is:
 }
 ```
 
-## Payment Receipt Ingest
-
-The Worker now supports inbound Quest receipt parsing through Cloudflare Email Routing:
-
-1. Route a receipt mailbox at the domain to this Worker using an Email Routing rule.
-2. Forward Quest payment receipts into that mailbox.
-3. The Worker parses the receipt email, resolves the matching MLS registration row, updates payment columns in the Google Sheet, and triggers the paid confirmation email.
-
-Notes:
-
-1. Receipt parsing is optimized for the current Quest receipt format used by Paducah GO Soccer.
-2. If the receipt email includes a `registration_submission_id` in any Quest URL, that ID is used directly.
-3. When the receipt does not carry the submission ID, the Worker falls back to a Google Apps Script lookup using parent email, parent name, amount, player count, and recency.
-4. Install dependency updates before deploying: `npm install`.
-
 ## Payment Flow
 
 The registration experience now uses a provider-neutral payment boundary:
