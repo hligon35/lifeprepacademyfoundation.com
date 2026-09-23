@@ -1,10 +1,8 @@
-import PostalMime from "postal-mime";
 import fontkit from "@pdf-lib/fontkit";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import { AGREEMENT_TEMPLATES } from "./template-hashes.js";
 import { PLAYER_AGREEMENT_FIELD_MAP, PPF_LIABILITY_FIELD_MAP, VOLUNTEER_AGREEMENT_FIELD_MAP } from "./pdf-field-maps.js";
 import { buildPaymentConfig } from "./payment-config.js";
-import { parseQuestReceiptEmail } from "./receipt-parser.mjs";
 
 const MAX_SIGNATURE_DATA_URL_BYTES = 1024 * 1024;
 const MAX_TYPED_SIGNATURE_LEN = 120;
@@ -143,9 +141,6 @@ export default {
     }
 
     return env.ASSETS.fetch(request);
-  },
-  async email(message, env, ctx) {
-    await handlePaymentReceiptEmail(message, env, ctx);
   },
 };
 
@@ -702,120 +697,6 @@ async function handlePaymentWebhook(request, env) {
   }
 
   return json({ ok: true, paid: true, emailed: true, submissionId: normalized.submissionId });
-}
-
-async function handlePaymentReceiptEmail(message, env, ctx) {
-  const rawBuffer = await new Response(message.raw).arrayBuffer();
-  const parsed = await PostalMime.parse(rawBuffer);
-  const receipt = parseQuestReceiptEmail({
-    subject: parsed.subject || message.headers.get("subject") || "",
-    text: parsed.text || "",
-    html: parsed.html || "",
-    date: message.headers.get("date") || "",
-  });
-
-  if (!receipt) {
-    console.log("payment-receipt-email-ignored", {
-      from: message.from,
-      to: message.to,
-      subject: parsed.subject || message.headers.get("subject") || "",
-    });
-    return;
-  }
-
-  const resolved = await resolvePaymentReceiptContext(env, receipt);
-  if (!resolved.ok) {
-    console.warn("payment-receipt-email-unmatched", {
-      orderId: receipt.orderId,
-      parentEmail: receipt.parentEmail,
-      error: resolved.error,
-    });
-    return;
-  }
-
-  const { submissionId, context } = resolved;
-  if (String(context.paymentStatus || "").trim().toLowerCase() === "paid") {
-    console.log("payment-receipt-email-duplicate", {
-      submissionId,
-      orderId: receipt.orderId,
-      parentEmail: context.parentEmail,
-    });
-    return;
-  }
-
-  const paymentUpdate = await updatePaymentInSheets(env, {
-    submissionId,
-    paymentStatus: "Paid",
-    paymentAmount: receipt.amount,
-    paymentCurrency: receipt.currency,
-    paymentPaidAt: receipt.paidAt,
-    paymentTransactionId: receipt.paymentTransactionId,
-    paymentReceiptUrl: receipt.receiptUrl,
-  });
-  if (!paymentUpdate.ok) {
-    console.warn("payment-receipt-sheet-update-failed", {
-      submissionId,
-      orderId: receipt.orderId,
-      error: paymentUpdate.error,
-    });
-    return;
-  }
-
-  let signedDocumentUrl = "";
-  if (context.transactionId) {
-    try {
-      signedDocumentUrl = await buildSignerUrl(`${PRIMARY_APP_ORIGIN}/`, context.transactionId, env, EMAIL_SIGNER_LINK_TTL_MS);
-    } catch (error) {
-      console.warn("payment-receipt-signer-url-failed", {
-        submissionId,
-        transactionId: context.transactionId,
-        error: String(error?.message || error),
-      });
-    }
-  }
-
-  const emailWork = sendRegistrationPaidEmail(env, {
-    submissionId,
-    parentEmail: context.parentEmail,
-    parentName: context.parentName,
-    participantNames: context.participantNames,
-    signedAt: context.signedAt,
-    signedDocumentUrl,
-    paymentUrl: buildPlayerRegistrationPaymentUrl({
-      firstName: splitName(context.parentName).firstName,
-      lastName: splitName(context.parentName).lastName,
-      email: context.parentEmail || receipt.parentEmail,
-      zip: receipt.postalCode || "",
-      submissionId,
-      amount: receipt.amount || "75",
-      currency: receipt.currency || "USD",
-    }),
-    paymentReceiptUrl: receipt.receiptUrl,
-    registrationFeeAmount: receipt.amount || "75",
-    paidAt: receipt.paidAt,
-  }).then((result) => {
-    if (!result.ok) {
-      console.warn("payment-receipt-email-send-failed", {
-        submissionId,
-        orderId: receipt.orderId,
-        error: result.error,
-      });
-    }
-    return result;
-  }).catch((error) => {
-    console.warn("payment-receipt-email-send-failed", {
-      submissionId,
-      orderId: receipt.orderId,
-      error: String(error?.message || error),
-    });
-    return { ok: false, error: String(error?.message || error) };
-  });
-
-  if (ctx && typeof ctx.waitUntil === "function") {
-    ctx.waitUntil(emailWork);
-  } else {
-    await emailWork;
-  }
 }
 
 async function handleSignerDownload(request, env) {
